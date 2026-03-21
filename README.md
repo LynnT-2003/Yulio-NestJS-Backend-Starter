@@ -1,64 +1,91 @@
-# NestJS API Template
+# NestJS Auth Boilerplate
 
-NestJS + Mongoose + Swagger API template, deployable to Vercel.
+Production-ready authentication boilerplate built on NestJS, MongoDB, and Passport.js. Designed as a reusable foundation — clone, configure environment variables, deploy.
 
-## Prerequisites
+| Layer          | Technology                                   |
+| -------------- | -------------------------------------------- |
+| Framework      | NestJS 11                                    |
+| Language       | TypeScript 5                                 |
+| Database       | MongoDB via Mongoose                         |
+| Authentication | Passport.js (local + Google OAuth 2.0 + JWT) |
+| Token Strategy | JWT access token (15m) + refresh token (30d) |
+| Validation     | class-validator + class-transformer          |
+| API Docs       | Swagger (OpenAPI 3.0)                        |
+| Deployment     | Vercel (serverless)                          |
 
-- Node.js >= 18
-- A MongoDB Atlas account (free tier works) — or a local MongoDB instance
+---
 
-## Setup
+## Table of Contents
 
-### 1. Install dependencies
+- [Quick Start](#quick-start)
+- [MongoDB Atlas Setup](#mongodb-atlas-setup)
+- [Google OAuth Setup](#google-oauth-setup)
+- [Environment Variables](#environment-variables)
+- [Vercel Deployment](#vercel-deployment)
+- [Architecture](#architecture)
+- [Request Lifecycle](#request-lifecycle)
+- [Sequence Diagrams](#sequence-diagrams)
+- [Data Models](#data-models)
+- [API Reference](#api-reference)
+- [Security Model](#security-model)
+- [Swagger Bearer Auth](#swagger-bearer-auth)
+- [Project Structure](#project-structure)
+
+---
+
+## Quick Start
 
 ```bash
+# 1. Install dependencies
 npm install
-```
 
-### 2. Create your environment file
-
-```bash
+# 2. Copy environment file
 cp .env.example .env
+
+# 3. Fill in .env (see sections below for MongoDB and Google OAuth)
+
+# 4. Run
+npm run start:dev
 ```
 
-### 3. Set up MongoDB Atlas (step by step)
+Once running:
 
-If you already have a MongoDB URI, skip to step 3.5.
+- API: `http://localhost:8080/api`
+- Swagger docs: `http://localhost:8080/api/docs`
 
-#### 3.1 Create an Atlas account
+---
 
-Go to [https://cloud.mongodb.com](https://cloud.mongodb.com) and sign up (free).
+## MongoDB Atlas Setup
 
-#### 3.2 Create a Cluster
+> If you already have a MongoDB connection string, skip to [step 5](#5-fill-in-env).
 
-A **cluster** is the server that hosts your databases. Think of it as the machine your data lives on.
+### 1. Create an Atlas account
 
-1. Click **"Build a Database"**
+Go to [cloud.mongodb.com](https://cloud.mongodb.com) and sign up (free tier works).
+
+### 2. Create a cluster
+
+A **cluster** is the server that hosts your databases.
+
+1. Click **Build a Database**
 2. Pick **M0 Free** tier
-3. Choose a cloud provider & region (pick one close to you)
-4. Give it a name (e.g. `my-cluster`) and click **Create Deployment**
+3. Choose a cloud provider and region close to you
+4. Name it (e.g. `my-cluster`) → **Create Deployment**
 
-#### 3.3 Create a Database User
+### 3. Create a database user
 
-This is the username/password your app uses to authenticate with MongoDB — it is NOT your Atlas login.
+This is the username/password your app uses to authenticate — **not** your Atlas login.
 
-1. In the Atlas sidebar, go to **Database Access**
+1. Go to **Database Access** in the sidebar
 2. Click **Add New Database User**
 3. Choose **Password** authentication
-4. Set a username and password (no special characters in the password to avoid URI encoding issues)
-5. Under **Database User Privileges**, select **Read and write to any database**
+4. Set a username and password (avoid special characters in the password to prevent URI encoding issues)
+5. Privileges: **Read and write to any database**
 6. Click **Add User**
 
-These values go into your `.env`:
+### 4. Get your cluster URI
 
-```
-MONGO_USERNAME=the_username_you_just_created
-MONGO_PASSWORD=the_password_you_just_created
-```
-
-#### 3.4 Get your Cluster URI
-
-1. Go to **Database** in the sidebar and click **Connect** on your cluster
+1. Go to **Database** in the sidebar → click **Connect** on your cluster
 2. Choose **Drivers**
 3. You'll see a connection string like:
 
@@ -66,341 +93,259 @@ MONGO_PASSWORD=the_password_you_just_created
 mongodb+srv://<username>:<password>@my-cluster.abc123.mongodb.net/?retryWrites=true&w=majority&appName=my-cluster
 ```
 
-4. Copy everything **after** `<password>@` — that's your cluster URI:
+4. Copy everything **after** `<password>@`. That is your cluster URI:
 
 ```
 my-cluster.abc123.mongodb.net/?retryWrites=true&w=majority&appName=my-cluster
 ```
 
-This goes into your `.env`:
+### 5. Fill in `.env`
 
-```
+```bash
+MONGO_USERNAME=the_username_from_step_3
+MONGO_PASSWORD=the_password_from_step_3
 MONGO_CLUSTER_URI=my-cluster.abc123.mongodb.net/?retryWrites=true&w=majority&appName=my-cluster
+MONGO_DB_NAME=myapp-dev
 ```
 
-> **How it works under the hood:** `buildMongoUri()` in `src/configs/mongo-uri-builder.ts` takes your cluster URI and database name and constructs the full `mongodb+srv://username:password@cluster/dbName?params` string. You don't build the URI yourself.
+> `buildMongoUri()` in `src/configs/mongo-uri-builder.ts` assembles the full `mongodb+srv://user:pass@cluster/db?params` connection string from these four values. You never construct the URI manually.
 
-#### 3.5 Choose a Database Name
+### 6. Allow network access
 
-A **database** is a container inside your cluster. One cluster can have multiple databases (e.g. one for dev, one for staging).
+1. Go to **Network Access** in the Atlas sidebar
+2. Click **Add IP Address**
+3. For development: **Allow Access from Anywhere** (`0.0.0.0/0`)
+4. For production: add your server's specific IP address
 
-A **collection** is like a table in SQL — it lives inside a database and holds your documents (records). Collections are created automatically when you first insert data via a Mongoose model/schema, so you don't need to create them manually.
+### Concepts
 
 ```
 Cluster (server)
 └── Database (e.g. "myapp-dev")
-    ├── Collection: users        ← created automatically from your User schema
-    ├── Collection: products     ← created automatically from your Product schema
-    └── Collection: orders       ← created automatically from your Order schema
+    ├── Collection: users        ← created automatically from your Mongoose schema
+    ├── Collection: products     ← created automatically when first document is inserted
+    └── Collection: orders
 ```
 
-Pick a name for your database and add it to `.env`:
+- **Database** = a container inside your cluster. Use one per environment (e.g. `myapp-dev`, `myapp-staging`).
+- **Collection** = like a SQL table. Created automatically when a Mongoose model inserts its first document.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `querySrv ENOTFOUND` | Wrong `MONGO_CLUSTER_URI` | Copy the URI again from Atlas → Connect → Drivers |
+| `Authentication failed` | Wrong credentials | Verify `MONGO_USERNAME` / `MONGO_PASSWORD` match your **Database User** (not Atlas login) |
+| `connection timed out` | IP not allowed | Add your IP in Atlas → Network Access |
+| `mongodb+srv://:@/` | Empty env vars | Ensure `.env` values are filled in |
+
+---
+
+## Google OAuth Setup
+
+### 1. Create a Google Cloud project
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Click the project dropdown → **New Project**
+3. Name it (e.g. `my-app-auth`) → **Create**
+
+### 2. Enable the People API
+
+1. Sidebar → **APIs & Services** → **Library**
+2. Search **Google People API** → **Enable**
+
+### 3. Configure OAuth consent screen
+
+1. **APIs & Services** → **OAuth consent screen**
+2. Choose **External** (any Google account) or **Internal** (Google Workspace only)
+3. Fill in: app name, support email, developer contact email
+4. On **Scopes**, add `userinfo.email` and `userinfo.profile`
+5. Save through the remaining steps
+
+### 4. Create OAuth credentials
+
+1. **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth client ID**
+2. Application type: **Web application**
+3. Under **Authorized redirect URIs**, add:
 
 ```
-MONGO_DB_NAME=myapp-dev
+http://localhost:8080/api/auth/google/callback
+https://yourdomain.com/api/auth/google/callback
 ```
 
-#### 3.6 Allow network access
+> The redirect URI must **exactly match** `GOOGLE_CALLBACK_URL` in your `.env`.
 
-1. In Atlas sidebar, go to **Network Access**
-2. Click **Add IP Address**
-3. For development: click **Allow Access from Anywhere** (`0.0.0.0/0`)
-4. For production: add your server's specific IP
+4. Click **Create** and copy the **Client ID** and **Client Secret**
 
-### 4. Your final `.env` should look like
+### 5. Fill in `.env`
 
+```bash
+GOOGLE_CLIENT_ID=123456789-abc.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-your-secret-here
+GOOGLE_CALLBACK_URL=http://localhost:8080/api/auth/google/callback
 ```
-APP_ENVIRONMENT=Development
 
+### Common errors
+
+| Error | Cause | Fix |
+| --- | --- | --- |
+| `redirect_uri_mismatch` | Callback URL in `.env` doesn't match Google Console | Ensure exact match including protocol and path |
+| `invalid_client` | Wrong Client ID or Secret | Verify `.env` values |
+| `Access blocked` | Consent screen not configured | Complete step 3 above |
+| `403 access_denied` | App in testing mode | Add your Google account under OAuth consent screen → Test users |
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the values.
+
+```bash
+# Application
+APP_ENVIRONMENT=Development           # Development | Staging | Production
+
+# Server
 PORT=8080
 BASE_URL=http://localhost:8080
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 
+# Rate Limiting
 RATE_LIMIT_TIMEFRAME_SECONDS=60
 RATE_LIMIT_MAX_REQUESTS=10
 
-MONGO_USERNAME=myuser
-MONGO_PASSWORD=mypassword123
-MONGO_CLUSTER_URI=my-cluster.abc123.mongodb.net/?retryWrites=true&w=majority&appName=my-cluster
-MONGO_DB_NAME=myapp-dev
+# MongoDB (see "MongoDB Atlas Setup" above)
+MONGO_USERNAME=
+MONGO_PASSWORD=
+MONGO_CLUSTER_URI=
+MONGO_DB_NAME=
 
-AUTH_TOKEN_SECRET=
-AUTH_REFRESH_TOKEN_SECRET=
+# JWT
+JWT_ACCESS_SECRET=                    # min 32 characters
+JWT_REFRESH_SECRET=                   # min 32 characters
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=30d
+
+# Google OAuth (see "Google OAuth Setup" above)
 GOOGLE_CLIENT_ID=
-RESET_PASSWORD_SECRET=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_CALLBACK_URL=http://localhost:8080/api/auth/google/callback
 ```
 
-## Running
-
-```bash
-# development (watch mode)
-npm run start:dev
-
-# production
-npm run build
-npm run start:prod
-```
-
-### What you should see on successful startup
-
-```
-[Nest] LOG   🚀 Application is running on: http://localhost:8080
-[Nest] LOG   📚 Swagger documentation: http://localhost:8080/api/docs
-[Nest] LOG   MongoDB connected: myapp-dev (host: my-cluster.abc123.mongodb.net)
-[Nest] WARN  No collections found in this database yet.
-```
-
-Collections appear automatically once you define Mongoose schemas and insert data.
-
-### What you'll see if MongoDB fails
-
-```
-[Nest] ERROR MongoDB connection error: querySrv ENOTFOUND _mongodb._tcp.bad-cluster.mongodb.net
-```
-
-Common causes:
-
-- **Wrong `MONGO_CLUSTER_URI`** — double check the value from Atlas Connect dialog
-- **Wrong credentials** — verify `MONGO_USERNAME` / `MONGO_PASSWORD` match your Database User (not your Atlas login)
-- **Network not allowed** — add your IP in Atlas > Network Access
-- **Empty env vars** — make sure `.env` values are filled in, not blank
-
-## Project Structure
-
-```
-src/
-├── configs/
-│   ├── api-docs.config.ts      # Swagger/OpenAPI setup (buildAPIDocs)
-│   ├── db-connection-names.ts  # Named DB connection constants
-│   ├── env.config.ts           # Centralized env loader (loadEnvConfigs)
-│   ├── mongo-uri-builder.ts    # Builds full MongoDB URI from cluster + db name
-│   └── types/
-│       └── env.ts              # TypeScript types for all env configs
-├── app.module.ts               # Root module — ConfigModule + MongooseModule + DB logging
-├── app.controller.ts           # Health check endpoint
-├── app.service.ts
-└── main.ts                     # Bootstrap — CORS, trust proxy, Swagger, listen
-```
-
-## Environment Variables
-
-See `.env.example` for the full list. Key variables:
-
-| Variable            | Description                                                   | Default                                       |
-| ------------------- | ------------------------------------------------------------- | --------------------------------------------- |
-| `PORT`              | Server port                                                   | `8080`                                        |
-| `ALLOWED_ORIGINS`   | Comma-separated CORS origins                                  | `http://localhost:3000,http://localhost:3001` |
-| `MONGO_CLUSTER_URI` | Atlas cluster URI (everything after `@` in connection string) | —                                             |
-| `MONGO_DB_NAME`     | Database name inside your cluster                             | —                                             |
-| `MONGO_USERNAME`    | Database user username                                        | —                                             |
-| `MONGO_PASSWORD`    | Database user password                                        | —                                             |
-
-## Deployment
-
-Configured for Vercel via `vercel.json`. Push to your connected repo and Vercel handles the rest. Make sure to set all env vars in your Vercel project settings.
-
-# NestJS Auth Boilerplate
-
-Production-ready authentication boilerplate built on NestJS, MongoDB, and Passport.js. Designed as a reusable foundation for client projects — drop in, configure environment variables, ship.
+All env vars are loaded once via `loadEnvConfigs()` in `src/configs/env.config.ts` and registered through `ConfigModule`. Access them anywhere via `ConfigService`.
 
 ---
 
-## Table of Contents
+## Vercel Deployment
 
-- [Stack](#stack)
-- [System Architecture](#system-architecture)
-- [Module Structure](#module-structure)
-- [Data Flow](#data-flow)
-- [Sequence Diagrams](#sequence-diagrams)
-  - [Local Registration](#1-local-registration)
-  - [Local Login](#2-local-login)
-  - [Google OAuth](#3-google-oauth-flow)
-  - [Authenticated Request](#4-authenticated-request-jwt-guard)
-  - [Token Refresh](#5-token-refresh)
-  - [Logout](#6-logout)
-- [Data Models](#data-models)
-- [API Reference](#api-reference)
-- [Security Model](#security-model)
-- [Environment Variables](#environment-variables)
-- [Installation](#installation)
-- [Project Structure](#project-structure)
+### 1. Set environment variables
 
----
+In your Vercel project → **Settings** → **Environment Variables**, add every variable from `.env.example` with production values. Key differences from local:
 
-## Stack
+| Variable | Production value |
+| --- | --- |
+| `APP_ENVIRONMENT` | `Production` |
+| `BASE_URL` | `https://your-app.vercel.app` |
+| `ALLOWED_ORIGINS` | Your frontend domain(s) |
+| `GOOGLE_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/google/callback` |
 
-| Layer          | Technology                                   |
-| -------------- | -------------------------------------------- |
-| Framework      | NestJS 10+                                   |
-| Language       | TypeScript 5+                                |
-| Database       | MongoDB via Mongoose                         |
-| Authentication | Passport.js (local + google-oauth20 + jwt)   |
-| Token Strategy | JWT access token (15m) + refresh token (30d) |
-| Validation     | class-validator + class-transformer          |
-| Deployment     | Vercel (serverless)                          |
+### 2. Push and deploy
+
+The repo includes `vercel.json` — push to your connected branch and Vercel deploys automatically.
+
+### How it works
+
+`main.ts` exports a default handler for Vercel serverless and only calls `app.listen()` for local dev (detected via the `VERCEL` env var that Vercel sets automatically). The NestJS app is cached across warm invocations.
 
 ---
 
-## System Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          CLIENT                                  │
-│              (Web App / Mobile App / Postman)                    │
+│                          CLIENT                                 │
+│              (Web App / Mobile App / Postman)                   │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTPS
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                        VERCEL EDGE                               │
-│                    (vercel.json routing)                         │
+│                        VERCEL EDGE                              │
+│                    (vercel.json routing)                        │
 └───────────────────────────┬─────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      NESTJS APPLICATION                          │
-│                                                                  │
-│  ┌─────────────┐   ┌──────────────┐   ┌─────────────────────┐  │
-│  │  Global     │   │   Global     │   │   Global            │  │
-│  │  Validation │──▶│   JwtGuard   │──▶│   RolesGuard        │  │
-│  │  Pipe       │   │   (APP_GUARD)│   │   (APP_GUARD)       │  │
-│  └─────────────┘   └──────────────┘   └─────────────────────┘  │
-│                            │                                     │
-│              ┌─────────────┴──────────────┐                     │
-│              ▼                            ▼                     │
-│  ┌───────────────────┐      ┌───────────────────────┐           │
-│  │   AuthModule      │      │     UserModule        │           │
-│  │                   │      │                       │           │
-│  │  AuthController   │      │  UserController       │           │
-│  │  AuthService      │─────▶│  UserService          │           │
-│  │  LocalStrategy    │      │  UserEntity           │           │
-│  │  GoogleStrategy   │      └───────────┬───────────┘           │
-│  │  JwtStrategy      │                  │                       │
-│  └───────────────────┘                  │                       │
-│                                         ▼                       │
-│                          ┌──────────────────────────┐           │
-│                          │        MongoDB            │           │
-│                          │   (users collection)      │           │
-│                          └──────────────────────────┘           │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  common/                                                  │   │
-│  │  enums · interfaces · decorators · guards · filters       │   │
-│  │  interceptors · pipes · strategies                        │   │
-│  └──────────────────────────────────────────────────────────┘   │
+│                      NESTJS APPLICATION                         │
+│                                                                 │
+│  ┌─────────────┐   ┌──────────────┐   ┌─────────────────────┐ │
+│  │  Validation  │   │   JwtGuard   │   │   RolesGuard        │ │
+│  │  Pipe        │──▶│   (global)   │──▶│   (global)          │ │
+│  └─────────────┘   └──────────────┘   └─────────────────────┘ │
+│                            │                                    │
+│              ┌─────────────┴──────────────┐                    │
+│              ▼                            ▼                    │
+│  ┌───────────────────┐      ┌───────────────────────┐          │
+│  │   AuthModule       │      │     UserModule        │          │
+│  │                    │      │                       │          │
+│  │  AuthController    │      │  UserController       │          │
+│  │  AuthService       │─────▶│  UserService          │          │
+│  │  LocalStrategy     │      │  UserEntity           │          │
+│  │  GoogleStrategy    │      └───────────┬───────────┘          │
+│  │  JwtStrategy       │                  │                      │
+│  └────────────────────┘                  │                      │
+│                                          ▼                      │
+│                           ┌──────────────────────────┐          │
+│                           │        MongoDB            │          │
+│                           │   (users collection)      │          │
+│                           └──────────────────────────┘          │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  common/                                                  │  │
+│  │  enums · interfaces · decorators · guards · filters       │  │
+│  │  interceptors · pipes · strategies                        │  │
+│  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Module Structure
+## Request Lifecycle
 
 ```
-src/
-├── main.ts                          Entry point
-├── app.module.ts                    Root module — global guards, DI wiring
-│
-├── common/                          Shared across all modules
-│   ├── enums/
-│   │   ├── user-role.enum.ts        USER | ADMIN
-│   │   └── oauth-provider.enum.ts   GOOGLE | LOCAL
-│   ├── interfaces/
-│   │   ├── user.interface.ts        IUser, IUserPublic, ICurrentUser
-│   │   └── auth.interface.ts        IJwtPayload, IAuthTokens, IAuthResponse
-│   ├── decorators/
-│   │   ├── current-user.decorator.ts  @CurrentUser()
-│   │   ├── public.decorator.ts        @Public()
-│   │   └── roles.decorator.ts         @Roles()
-│   ├── guards/
-│   │   ├── jwt.guard.ts             Global — protects all routes
-│   │   └── roles.guard.ts           Global — enforces @Roles()
-│   ├── strategies/
-│   │   └── jwt.strategy.ts          Validates Bearer token on every request
-│   ├── filters/
-│   │   └── http-exception.filter.ts  Consistent error response shape
-│   ├── interceptors/
-│   │   └── transform.interceptor.ts  Wraps all responses in { success, data }
-│   └── pipes/
-│       └── validation.pipe.ts        Global DTO validation
-│
-└── modules/
-    ├── auth/
-    │   ├── interfaces/
-    │   │   └── auth.service.interface.ts   IAuthService contract
-    │   ├── dto/
-    │   │   ├── register.dto.ts
-    │   │   ├── login.dto.ts
-    │   │   └── refresh-token.dto.ts
-    │   ├── strategies/
-    │   │   ├── local.strategy.ts    email + password
-    │   │   └── google.strategy.ts   OAuth2
-    │   ├── guards/
-    │   │   ├── local.guard.ts
-    │   │   ├── google.guard.ts
-    │   │   └── google-callback.guard.ts
-    │   ├── auth.service.ts
-    │   ├── auth.controller.ts
-    │   └── auth.module.ts
-    │
-    └── user/
-        ├── interfaces/
-        │   └── user.service.interface.ts   IUserService contract
-        ├── entity/
-        │   └── user.entity.ts       Mongoose schema + subdocuments
-        ├── dto/
-        │   ├── update-user.dto.ts
-        │   └── oauth-user.dto.ts    Internal — passport → service
-        ├── user.service.ts
-        ├── user.controller.ts
-        └── user.module.ts
-```
-
----
-
-## Data Flow
-
-```
-                    ┌──────────────────────────────────────────┐
-                    │              Request Lifecycle            │
-                    └──────────────────────────────────────────┘
-
 HTTP Request
      │
      ▼
 ┌─────────────────┐
-│ ValidationPipe  │  Strips unknown fields, validates DTO shape
+│ ValidationPipe   │  Strips unknown fields, validates DTO
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│   JwtGuard      │  Checks @Public() metadata
-│   (global)      │  If not public → verifies Bearer token
+│   JwtGuard       │  Checks @Public() — if not public, verifies Bearer token
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  JwtStrategy    │  Decodes payload → findById() → attaches ICurrentUser
-│  .validate()    │  to req.user
+│  JwtStrategy     │  Decodes JWT → findById() → attaches ICurrentUser to req.user
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│   RolesGuard    │  Checks @Roles() metadata against req.user.role
-│   (global)      │
+│   RolesGuard     │  Checks @Roles() metadata against req.user.role
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│   Controller    │  Reads @CurrentUser(), @Body(), @Param()
+│   Controller     │  @CurrentUser(), @Body(), @Param()
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│    Service      │  Business logic, DB calls, token generation
+│    Service       │  Business logic, DB calls, token generation
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  TransformInt.  │  Wraps response: { success, statusCode, data, timestamp }
+│ TransformInt.    │  Wraps response: { success, statusCode, data, timestamp }
 └────────┬────────┘
          │
          ▼
@@ -408,8 +353,8 @@ HTTP Request
 
      On error:
 ┌─────────────────┐
-│ HttpException   │  { success: false, statusCode, message, path, timestamp }
-│    Filter       │
+│ HttpException    │  { success: false, statusCode, message, path, timestamp }
+│    Filter        │
 └─────────────────┘
 ```
 
@@ -417,206 +362,140 @@ HTTP Request
 
 ## Sequence Diagrams
 
-### 1. Local Registration
+### Local Registration
 
 ```
 Client          AuthController      AuthService         UserService        MongoDB
   │                   │                  │                   │                │
-  │ POST /auth/register│                  │                   │                │
-  │ { email, password, │                  │                   │                │
-  │   displayName }    │                  │                   │                │
+  │ POST /api/auth/register              │                   │                │
+  │ { email, password,│                  │                   │                │
+  │   displayName }   │                  │                   │                │
   │──────────────────▶│                  │                   │                │
-  │                   │ register(dto)     │                   │                │
+  │                   │ register(dto)    │                   │                │
   │                   │─────────────────▶│                   │                │
-  │                   │                  │ findByEmail()      │                │
-  │                   │                  │──────────────────▶│                │
-  │                   │                  │                   │ findOne(email)  │
+  │                   │                  │ findByEmail()     │                │
+  │                   │                  │─────────────────▶ │                │
+  │                   │                  │                   │ findOne(email) │
   │                   │                  │                   │───────────────▶│
-  │                   │                  │                   │◀───────────────│
-  │                   │                  │◀──────────────────│ null           │
+  │                   │                  │◀─────────────────── null           │
   │                   │                  │                   │                │
   │                   │                  │ bcrypt.hash(pw)   │                │
-  │                   │                  │──────┐            │                │
-  │                   │                  │◀─────┘            │                │
   │                   │                  │                   │                │
   │                   │                  │ createLocalUser() │                │
-  │                   │                  │──────────────────▶│                │
-  │                   │                  │                   │ save(user)     │
+  │                   │                  │─────────────────▶ │ save(user)     │
   │                   │                  │                   │───────────────▶│
-  │                   │                  │                   │◀───────────────│
-  │                   │                  │◀──────────────────│ UserDocument   │
+  │                   │                  │◀──────────────────── UserDocument  │
   │                   │                  │                   │                │
   │                   │                  │ generateTokens()  │                │
-  │                   │                  │──────┐            │                │
-  │                   │                  │◀─────┘            │                │
-  │                   │                  │                   │                │
   │                   │                  │ saveRefreshToken()│                │
-  │                   │                  │──────────────────▶│                │
-  │                   │                  │                   │ $push token    │
+  │                   │                  │─────────────────▶ │ $push token    │
   │                   │                  │                   │───────────────▶│
   │                   │◀─────────────────│                   │                │
-  │                   │ { user, tokens } │                   │                │
-  │◀──────────────────│                  │                   │                │
-  │ 201 { success,    │                  │                   │                │
-  │   data: {         │                  │                   │                │
-  │     user: IUserPublic,               │                   │                │
-  │     tokens: {     │                  │                   │                │
-  │       accessToken,│                  │                   │                │
-  │       refreshToken│                  │                   │                │
-  │     }}}           │                  │                   │                │
+  │◀──────────────────│ 201 { user, tokens }                 │                │
 ```
 
-### 2. Local Login
+### Local Login
 
 ```
 Client          LocalGuard       LocalStrategy      AuthService       UserService
   │                 │                 │                  │                 │
-  │ POST /auth/login│                 │                  │                 │
+  │ POST /api/auth/login              │                  │                 │
   │ { email, pw }   │                 │                  │                 │
   │────────────────▶│                 │                  │                 │
-  │                 │ canActivate()   │                  │                 │
-  │                 │────────────────▶│                  │                 │
-  │                 │                 │ validate(email,pw)│                │
-  │                 │                 │─────────────────▶│                 │
-  │                 │                 │                  │ findByEmail()   │
-  │                 │                 │                  │ (+password)     │
-  │                 │                 │                  │────────────────▶│
-  │                 │                 │                  │◀────────────────│
-  │                 │                 │                  │ UserDocument    │
-  │                 │                 │                  │                 │
-  │                 │                 │                  │ bcrypt.compare()│
-  │                 │                 │                  │─────┐           │
-  │                 │                 │                  │◀────┘           │
-  │                 │                 │◀─────────────────│ UserDocument    │
-  │                 │ req.user = doc  │                  │                 │
-  │                 │◀────────────────│                  │                 │
-  │                 │                 │                  │                 │
-  │           AuthController          │                  │                 │
-  │                 │ login(req.user) │                  │                 │
-  │                 │─────────────────────────────────▶ │                 │
-  │                 │                 │                  │ generateTokens()│
-  │                 │                 │                  │─────┐           │
-  │                 │                 │                  │◀────┘           │
-  │◀────────────────────────────────────────────────────│                 │
-  │ 200 { user, tokens }              │                  │                 │
+  │                 │ validate(email,pw)                  │                 │
+  │                 │────────────────▶│                   │                 │
+  │                 │                 │ validateLocal()   │                 │
+  │                 │                 │─────────────────▶ │ findByEmail()   │
+  │                 │                 │                   │────────────────▶│
+  │                 │                 │                   │◀────────────────│
+  │                 │                 │                   │ bcrypt.compare()│
+  │                 │                 │◀──────────────────│ UserDocument    │
+  │                 │ req.user = doc  │                   │                 │
+  │                 │◀────────────────│                   │                 │
+  │           AuthController         │                   │                 │
+  │                 │ login(req.user) │                   │                 │
+  │                 │──────────────────────────────────▶  │                 │
+  │                 │                 │                   │ generateTokens()│
+  │◀────────────────│ 200 { user, tokens }                │                 │
 ```
 
-### 3. Google OAuth Flow
+### Google OAuth
 
 ```
 Client           AuthController    GoogleStrategy      UserService      AuthService
   │                   │                 │                   │                │
-  │ GET /auth/google  │                 │                   │                │
+  │ GET /api/auth/google                │                   │                │
   │──────────────────▶│                 │                   │                │
-  │                   │ GoogleGuard     │                   │                │
-  │◀──────────────────│ 302 redirect    │                   │                │
-  │                   │ → Google OAuth  │                   │                │
+  │◀──────────────────│ 302 → Google    │                   │                │
   │                   │                 │                   │                │
-  │  [User approves Google consent]     │                   │                │
+  │  [User approves consent screen]     │                   │                │
   │                   │                 │                   │                │
-  │ GET /auth/google/callback?code=...  │                   │                │
+  │ GET /api/auth/google/callback?code=...                  │                │
   │──────────────────▶│                 │                   │                │
-  │                   │ GoogleCallback  │                   │                │
-  │                   │ Guard           │                   │                │
   │                   │────────────────▶│                   │                │
   │                   │                 │ validate(profile) │                │
-  │                   │                 │ build OAuthUserDto│                │
   │                   │                 │──────────────────▶│                │
   │                   │                 │                   │ findOrCreate   │
-  │                   │                 │                   │ OAuthUser()    │
-  │                   │                 │                   │────┐           │
-  │                   │                 │                   │◀───┘           │
   │                   │                 │◀──────────────────│ UserDocument   │
-  │                   │                 │                   │                │
   │                   │                 │ oauthLogin(user)  │                │
   │                   │                 │──────────────────────────────────▶│
-  │                   │                 │                   │  generateTokens│
   │                   │                 │◀──────────────────────────────────│
-  │                   │                 │ IAuthResponse     │                │
-  │                   │ req.user =      │                   │                │
-  │                   │ IAuthResponse   │                   │                │
-  │◀──────────────────│                 │                   │                │
-  │ 200 { user, tokens}                 │                   │                │
+  │◀──────────────────│ 200 { user, tokens }                │                │
 ```
 
-### 4. Authenticated Request (JWT Guard)
+### Authenticated Request
 
 ```
 Client            JwtGuard         JwtStrategy          UserService
   │                  │                  │                    │
-  │ GET /users/me    │                  │                    │
-  │ Authorization:   │                  │                    │
+  │ GET /api/users/me│                  │                    │
   │ Bearer <token>   │                  │                    │
   │─────────────────▶│                  │                    │
-  │                  │ canActivate()    │                    │
   │                  │ check @Public()  │                    │
   │                  │ → not public     │                    │
   │                  │─────────────────▶│                    │
-  │                  │                  │ verify signature   │
-  │                  │                  │ check expiry       │
-  │                  │                  │ decode payload     │
-  │                  │                  │                    │
-  │                  │                  │ validate(payload)  │
+  │                  │                  │ verify + decode    │
   │                  │                  │ findById(sub)      │
   │                  │                  │───────────────────▶│
   │                  │                  │◀───────────────────│
-  │                  │                  │ UserDocument       │
-  │                  │                  │                    │
   │                  │ req.user =       │                    │
   │                  │ ICurrentUser     │                    │
   │                  │◀─────────────────│                    │
-  │                  │                  │                    │
-  │            UserController           │                    │
-  │                  │ getMe()          │                    │
+  │            UserController          │                    │
   │                  │ @CurrentUser()   │                    │
-  │                  │ → req.user       │                    │
-  │◀─────────────────│                  │                    │
-  │ 200 { IUserPublic}                  │                    │
+  │◀─────────────────│ 200 IUserPublic │                    │
 ```
 
-### 5. Token Refresh
+### Token Refresh
 
 ```
 Client          AuthController      AuthService          UserService
   │                   │                  │                    │
-  │ POST /auth/refresh│                  │                    │
+  │ POST /api/auth/refresh               │                    │
   │ { userId,         │                  │                    │
   │   refreshToken }  │                  │                    │
   │──────────────────▶│                  │                    │
   │                   │ refreshTokens()  │                    │
   │                   │─────────────────▶│                    │
   │                   │                  │ findValidRefresh   │
-  │                   │                  │ Token(userId, tok) │
+  │                   │                  │ Token()            │
   │                   │                  │───────────────────▶│
-  │                   │                  │                    │ findById
-  │                   │                  │                    │ +refreshTokens
   │                   │                  │                    │ bcrypt.compare
   │                   │                  │◀───────────────────│
-  │                   │                  │ UserDocument | null│
-  │                   │                  │                    │
-  │                   │                  │ [if null → 401]    │
-  │                   │                  │                    │
-  │                   │                  │ removeRefreshToken │
-  │                   │                  │ (old stored hash)  │
+  │                   │                  │ removeOldToken     │
+  │                   │                  │ generateNewPair    │
+  │                   │                  │ saveNewToken       │
   │                   │                  │───────────────────▶│
-  │                   │                  │                    │ $pull token
-  │                   │                  │                    │
-  │                   │                  │ generateTokens()   │
-  │                   │                  │ (new pair)         │
-  │                   │                  │───────────────────▶│
-  │                   │                  │                    │ $push new hash
   │                   │◀─────────────────│                    │
-  │◀──────────────────│ { accessToken,   │                    │
-  │ 200 new tokens    │   refreshToken } │                    │
+  │◀──────────────────│ 200 { accessToken, refreshToken }    │
 ```
 
-### 6. Logout
+### Logout
 
 ```
 Client          AuthController      AuthService          UserService
   │                   │                  │                    │
-  │ POST /auth/logout │                  │                    │
-  │ Authorization:    │                  │                    │
+  │ POST /api/auth/logout                │                    │
   │ Bearer <token>    │                  │                    │
   │ { userId,         │                  │                    │
   │   refreshToken }  │                  │                    │
@@ -627,18 +506,10 @@ Client          AuthController      AuthService          UserService
   │                   │                  │ findValidRefresh   │
   │                   │                  │ Token()            │
   │                   │                  │───────────────────▶│
-  │                   │                  │◀───────────────────│
-  │                   │                  │                    │
-  │                   │                  │ [if null → return] │
-  │                   │                  │                    │
-  │                   │                  │ iterate tokens     │
-  │                   │                  │ bcrypt.compare()   │
   │                   │                  │ removeRefreshToken │
-  │                   │                  │ (matching hash)    │
   │                   │                  │───────────────────▶│
-  │                   │                  │                    │ $pull token
   │                   │◀─────────────────│                    │
-  │◀──────────────────│ 200 void         │                    │
+  │◀──────────────────│ 200              │                    │
 ```
 
 ---
@@ -650,29 +521,29 @@ Client          AuthController      AuthService          UserService
 ```
 users collection
 ┌─────────────────────────────────────────────────────────┐
-│ Field             Type              Notes                │
+│ Field             Type              Notes               │
 ├─────────────────────────────────────────────────────────┤
-│ _id               ObjectId          Auto-generated       │
-│ email             string | null     unique, sparse       │
+│ _id               ObjectId          Auto-generated      │
+│ email             string | null     unique, sparse      │
 │ password          string | null     bcrypt, select:false │
-│ displayName       string            required             │
-│ avatar            string | null                          │
-│ role              UserRole          default: USER        │
-│ isEmailVerified   boolean           default: false       │
-│ providers         OAuthProvider[]   subdocument array    │
-│ refreshTokens     RefreshToken[]    bcrypt, select:false │
-│ createdAt         Date              auto (timestamps)    │
-│ updatedAt         Date              auto (timestamps)    │
+│ displayName       string            required            │
+│ avatar            string | null                         │
+│ role              UserRole          default: 'user'     │
+│ isEmailVerified   boolean           default: false      │
+│ providers         OAuthProvider[]   subdocument array   │
+│ refreshTokens     RefreshToken[]    select:false        │
+│ createdAt         Date              auto (timestamps)   │
+│ updatedAt         Date              auto (timestamps)   │
 └─────────────────────────────────────────────────────────┘
 
-OAuthProvider subdocument (_id: false)
+OAuthProvider subdocument
 ┌─────────────────────────────────────────────────────────┐
 │ provider          OAuthProviderType  'google' | 'local' │
-│ providerId        string             unique per provider │
+│ providerId        string             unique per provider│
 │ accessToken       string | null                         │
 └─────────────────────────────────────────────────────────┘
 
-RefreshToken subdocument (_id: false)
+RefreshToken subdocument
 ┌─────────────────────────────────────────────────────────┐
 │ token             string             bcrypt hash        │
 │ createdAt         Date                                  │
@@ -680,12 +551,11 @@ RefreshToken subdocument (_id: false)
 └─────────────────────────────────────────────────────────┘
 ```
 
-### MongoDB Indexes
+### Indexes
 
 ```
-{ email: 1 }                              unique, sparse
-{ providers.provider: 1,
-  providers.providerId: 1 }               compound — OAuth lookup
+{ email: 1 }                                    unique, sparse
+{ "providers.provider": 1, "providers.providerId": 1 }   compound
 ```
 
 ---
@@ -695,15 +565,15 @@ RefreshToken subdocument (_id: false)
 All responses are wrapped by `TransformInterceptor`:
 
 ```json
-// Success
 {
   "success": true,
   "statusCode": 200,
-  "data": { ... },
+  "data": { "..." },
   "timestamp": "2026-01-01T00:00:00.000Z"
 }
+```
 
-// Error
+```json
 {
   "success": false,
   "statusCode": 401,
@@ -715,105 +585,72 @@ All responses are wrapped by `TransformInterceptor`:
 
 ### Auth Endpoints
 
-| Method | Path                        | Guard                        | Body              | Description      |
-| ------ | --------------------------- | ---------------------------- | ----------------- | ---------------- |
-| POST   | `/api/auth/register`        | Public                       | `RegisterDto`     | Create account   |
-| POST   | `/api/auth/login`           | Public + LocalGuard          | `LoginDto`        | Local login      |
-| POST   | `/api/auth/refresh`         | Public                       | `RefreshTokenDto` | Rotate tokens    |
-| POST   | `/api/auth/logout`          | JwtGuard                     | `RefreshTokenDto` | Invalidate token |
-| GET    | `/api/auth/google`          | Public + GoogleGuard         | —                 | Initiate OAuth   |
-| GET    | `/api/auth/google/callback` | Public + GoogleCallbackGuard | —                 | OAuth callback   |
+| Method | Path | Guard | Body | Description |
+| --- | --- | --- | --- | --- |
+| POST | `/api/auth/register` | Public | `RegisterDto` | Create account |
+| POST | `/api/auth/login` | Public + LocalGuard | `LoginDto` | Email/password login |
+| POST | `/api/auth/refresh` | Public | `RefreshTokenDto` | Rotate token pair |
+| POST | `/api/auth/logout` | JwtGuard | `RefreshTokenDto` | Invalidate refresh token |
+| GET | `/api/auth/google` | Public + GoogleGuard | — | Redirect to Google |
+| GET | `/api/auth/google/callback` | Public + GoogleCallbackGuard | — | OAuth callback |
 
 ### User Endpoints
 
-| Method | Path               | Guard            | Body            | Description      |
-| ------ | ------------------ | ---------------- | --------------- | ---------------- |
-| GET    | `/api/users/me`    | JwtGuard         | —               | Get own profile  |
-| PATCH  | `/api/users/me`    | JwtGuard         | `UpdateUserDto` | Update profile   |
-| DELETE | `/api/users/me`    | JwtGuard         | —               | Delete account   |
-| GET    | `/api/users/admin` | JwtGuard + ADMIN | —               | Admin only route |
+| Method | Path | Guard | Body | Description |
+| --- | --- | --- | --- | --- |
+| GET | `/api/users/me` | JwtGuard | — | Get own profile |
+| PATCH | `/api/users/me` | JwtGuard | `UpdateUserDto` | Update profile |
+| DELETE | `/api/users/me` | JwtGuard | — | Delete account |
+| GET | `/api/users/admin` | JwtGuard + `@Roles(ADMIN)` | — | Admin-only route |
 
 ---
 
 ## Security Model
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                      SECURITY LAYERS                           │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  1. TRANSPORT        HTTPS enforced via Vercel edge            │
-│                                                                │
-│  2. INPUT            class-validator — whitelist, strip        │
-│                      forbidNonWhitelisted on all DTOs          │
-│                                                                │
-│  3. AUTHENTICATION   JWT access token — 15 min expiry          │
-│                      Signed with dedicated ACCESS_SECRET       │
-│                                                                │
-│  4. REFRESH          Refresh token — 30 day expiry             │
-│                      Stored as bcrypt hash in MongoDB          │
-│                      Rotated on every use (invalidate + new)   │
-│                      Expired tokens pruned on save             │
-│                                                                │
-│  5. PASSWORDS        bcrypt — 10 salt rounds                   │
-│                      select: false — never returned in queries │
-│                                                                │
-│  6. AUTHORIZATION    Role-based via @Roles() + RolesGuard      │
-│                      Checked after JWT validation              │
-│                                                                │
-│  7. DATA             password + refreshTokens select:false     │
-│                      IUserPublic strips sensitive fields       │
-│                      OAuthProvider exposes name only, not token│
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
-```
+| Layer | Implementation |
+| --- | --- |
+| Transport | HTTPS enforced via Vercel edge |
+| Input validation | class-validator with whitelist and `forbidNonWhitelisted` |
+| Authentication | JWT access token — 15 min expiry, signed with `JWT_ACCESS_SECRET` |
+| Refresh tokens | 30 day expiry, stored as bcrypt hash in MongoDB, rotated on every use |
+| Passwords | bcrypt (10 salt rounds), `select: false` on schema |
+| Authorization | Role-based via `@Roles()` + `RolesGuard`, checked after JWT validation |
+| Data exposure | `password` and `refreshTokens` excluded from queries via `select: false`; `IUserPublic` strips sensitive fields; OAuth providers expose name only |
 
 ---
 
-## Environment Variables
+## Swagger Bearer Auth
 
-```bash
-# Application
-PORT=3000
+The Swagger UI at `/api/docs` supports Bearer token authentication.
 
-# MongoDB
-MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/<db>
+### How it works
 
-# JWT
-JWT_ACCESS_SECRET=your-access-secret-min-32-chars
-JWT_REFRESH_SECRET=your-refresh-secret-min-32-chars
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=30d
+`api-docs.config.ts` registers a Bearer auth scheme with the reference name `JWT-auth`:
 
-# Google OAuth
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_CALLBACK_URL=https://yourdomain.com/api/auth/google/callback
+```typescript
+.addBearerAuth(
+  { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', ... },
+  'JWT-auth',
+)
 ```
 
----
+Protected controllers reference it with `@ApiBearerAuth('JWT-auth')`:
 
-## Installation
-
-```bash
-# Install dependencies
-npm install
-
-# Install auth packages
-npm install @nestjs/passport @nestjs/jwt passport passport-local passport-google-oauth20 passport-jwt bcrypt class-validator class-transformer mongoose @nestjs/mongoose ms
-
-# Install type definitions
-npm install -D @types/passport-local @types/passport-google-oauth20 @types/passport-jwt @types/bcrypt
-
-# Copy environment file
-cp .env.example .env
-
-# Run development
-npm run start:dev
-
-# Run production
-npm run build && npm run start:prod
+```typescript
+@ApiBearerAuth('JWT-auth')
+@Controller('users')
+export class UserController { ... }
 ```
+
+### Using it in Swagger UI
+
+1. Open `http://localhost:8080/api/docs`
+2. Click **Authorize** (top right)
+3. Paste the `accessToken` from a login/register response
+4. Click **Authorize** → **Close**
+5. All protected routes now send `Authorization: Bearer <token>` automatically
+
+> Routes marked `@Public()` still show the lock icon in Swagger but work without a token.
 
 ---
 
@@ -821,294 +658,99 @@ npm run build && npm run start:prod
 
 ```
 src/
-├── main.ts
-├── app.module.ts
+├── main.ts                              Entry point (local + Vercel serverless)
+├── app.module.ts                        Root module — global guards, config, DB
+├── app.controller.ts                    Health check
+├── app.service.ts
+│
+├── configs/
+│   ├── env.config.ts                    loadEnvConfigs() — single source of truth
+│   ├── api-docs.config.ts               buildAPIDocs() — Swagger setup
+│   ├── mongo-uri-builder.ts             buildMongoUri() — assembles connection string
+│   ├── db-connection-names.ts           Named connection constants (multi-DB ready)
+│   └── types/
+│       └── env.ts                       TypeScript types for all config sections
+│
 ├── common/
 │   ├── enums/
-│   │   ├── user-role.enum.ts
-│   │   ├── oauth-provider.enum.ts
-│   │   └── index.ts
+│   │   ├── user-role.enum.ts            USER | ADMIN
+│   │   └── oauth-provider.enum.ts       GOOGLE | LOCAL
 │   ├── interfaces/
-│   │   ├── user.interface.ts
-│   │   ├── auth.interface.ts
-│   │   └── index.ts
+│   │   ├── user.interface.ts            IUser, IUserPublic, ICurrentUser
+│   │   └── auth.interface.ts            IJwtPayload, IAuthTokens, IAuthResponse
 │   ├── decorators/
-│   │   ├── current-user.decorator.ts
-│   │   ├── public.decorator.ts
-│   │   └── roles.decorator.ts
+│   │   ├── current-user.decorator.ts    @CurrentUser() — reads req.user
+│   │   ├── public.decorator.ts          @Public() — skips JwtGuard
+│   │   └── roles.decorator.ts           @Roles() — sets required role
 │   ├── guards/
-│   │   ├── jwt.guard.ts
-│   │   └── roles.guard.ts
+│   │   ├── jwt.guard.ts                 Global — protects all routes by default
+│   │   └── roles.guard.ts              Global — enforces @Roles()
 │   ├── strategies/
-│   │   └── jwt.strategy.ts
+│   │   └── jwt.strategy.ts              Validates Bearer token, attaches user
 │   ├── filters/
-│   │   └── http-exception.filter.ts
+│   │   └── http-exception.filter.ts     Consistent error response shape
 │   ├── interceptors/
-│   │   └── transform.interceptor.ts
+│   │   └── transform.interceptor.ts     Wraps all responses in { success, data }
 │   └── pipes/
-│       └── validation.pipe.ts
-└── modules/
-    ├── auth/
-    │   ├── interfaces/auth.service.interface.ts
-    │   ├── dto/
-    │   │   ├── register.dto.ts
-    │   │   ├── login.dto.ts
-    │   │   ├── refresh-token.dto.ts
-    │   │   └── index.ts
-    │   ├── strategies/
-    │   │   ├── local.strategy.ts
-    │   │   └── google.strategy.ts
-    │   ├── guards/
-    │   │   ├── local.guard.ts
-    │   │   ├── google.guard.ts
-    │   │   └── google-callback.guard.ts
-    │   ├── auth.service.ts
-    │   ├── auth.controller.ts
-    │   └── auth.module.ts
-    └── user/
-        ├── interfaces/user.service.interface.ts
-        ├── entity/user.entity.ts
-        ├── dto/
-        │   ├── update-user.dto.ts
-        │   ├── oauth-user.dto.ts
-        │   └── index.ts
-        ├── user.service.ts
-        ├── user.controller.ts
-        └── user.module.ts
+│       └── validation.pipe.ts           Global DTO validation
+│
+├── auth/
+│   ├── interfaces/
+│   │   └── auth.service.interface.ts    IAuthService contract
+│   ├── dto/
+│   │   ├── register.dto.ts
+│   │   ├── login.dto.ts
+│   │   └── refresh-token.dto.ts
+│   ├── strategies/
+│   │   ├── local.strategy.ts            Email + password validation
+│   │   └── google.strategy.ts           OAuth 2.0
+│   ├── guards/
+│   │   ├── local.guard.ts
+│   │   ├── google.guard.ts
+│   │   └── google-callback.guard.ts
+│   ├── auth.service.ts
+│   ├── auth.controller.ts
+│   └── auth.module.ts
+│
+└── user/
+    ├── interfaces/
+    │   └── user.service.interface.ts     IUserService contract
+    ├── entity/
+    │   └── user.entity.ts               Mongoose schema + subdocuments
+    ├── dto/
+    │   ├── update-user.dto.ts
+    │   └── oauth-user.dto.ts            Internal — Passport → service
+    ├── user.service.ts
+    ├── user.controller.ts
+    └── user.module.ts
 ```
 
 ---
 
-_Built as a reusable boilerplate. Add providers by creating a new strategy file and registering it in `AuthModule` — the rest of the architecture requires no changes._
+## How `@CurrentUser()` Works
+
+A common point of confusion — it looks like magic but is entirely driven by the JWT in the request header.
+
+```
+1. Client sends: Authorization: Bearer <accessToken>
+2. JwtGuard checks @Public() — if not public, hands off to JwtStrategy
+3. JwtStrategy verifies signature, checks expiry, decodes payload { sub, email, role }
+4. JwtStrategy.validate() calls findById(sub) → returns ICurrentUser { userId, email, role }
+5. Passport attaches it to req.user
+6. @CurrentUser() reads req.user — no decoding, that's already done
+```
+
+If no token is sent or the token is expired, JwtGuard returns `401 Unauthorized` before the controller ever runs.
 
 ---
 
-## How JWT and Bearer Token Work
+## Adding a New Feature Module
 
-A common point of confusion — `@CurrentUser()` looks like magic but it is entirely driven by the Bearer token in the request header.
+1. Create `src/your-module/` with controller, service, module, entity, DTOs
+2. Register the Mongoose schema in your module: `MongooseModule.forFeature([...])`
+3. Import your module in `app.module.ts`
+4. Protected by default (JwtGuard is global) — add `@Public()` to opt out
+5. Add `@Roles()` for role-restricted routes
+6. Add `@ApiTags()` and `@ApiBearerAuth('JWT-auth')` for Swagger
 
-```
-Every protected request must include:
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-Full chain:
-─────────────────────────────────────────────────────────────────
-
-1. Client sends request with Authorization: Bearer <accessToken>
-
-2. JwtGuard (registered globally via APP_GUARD) intercepts every request
-   → Checks if route is marked @Public() — if yes, skips entirely
-   → If not public, hands off to JwtStrategy
-
-3. JwtStrategy (passport-jwt) automatically:
-   → Extracts the token from the Authorization header
-   → Verifies the signature using JWT_ACCESS_SECRET
-   → Checks the expiry (exp claim)
-   → Decodes the payload: { sub, email, role }
-
-4. JwtStrategy.validate(payload) runs:
-   → Calls userService.findById(payload.sub)
-   → Confirms user still exists in DB
-   → Returns ICurrentUser: { userId, email, role }
-
-5. Passport attaches the return value to req.user
-
-6. @CurrentUser() decorator simply reads req.user
-   → No token handling, no decoding — that is already done
-
-─────────────────────────────────────────────────────────────────
-
-So this controller method:
-
-  @Get('me')
-  getMe(@CurrentUser() user: ICurrentUser) {
-    ...
-  }
-
-Is equivalent to:
-
-  @Get('me')
-  getMe(@Req() req: Request) {
-    const user = req.user as ICurrentUser; // set by JwtStrategy
-    ...
-  }
-
-@CurrentUser() is purely a readability shortcut.
-```
-
-**What happens if no token is sent:**
-
-```
-→ JwtGuard detects missing/invalid token
-→ Returns 401 Unauthorized before the controller ever runs
-→ @CurrentUser() is never called
-```
-
-**What happens if token is expired:**
-
-```
-→ passport-jwt checks exp claim
-→ Returns 401 Unauthorized automatically
-→ Client must call POST /api/auth/refresh to get new tokens
-```
-
----
-
-## Google OAuth Setup
-
-Yes — Google Cloud Console at [console.cloud.google.com](https://console.cloud.google.com).
-
-### Step 1 — Create a project
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Click the project dropdown at the top → **New Project**
-3. Give it a name (e.g. `my-app-auth`) → **Create**
-
-### Step 2 — Enable the Google+ API
-
-1. In the left sidebar → **APIs & Services** → **Library**
-2. Search for **Google People API** → **Enable**
-   > Note: The older "Google+ API" is deprecated. Use **Google People API** — passport-google-oauth20 works with it.
-
-### Step 3 — Configure OAuth consent screen
-
-1. **APIs & Services** → **OAuth consent screen**
-2. Choose **External** (for any Google account) or **Internal** (G Suite only)
-3. Fill in:
-   - App name
-   - User support email
-   - Developer contact email
-4. Click **Save and Continue**
-5. On **Scopes** → Add:
-   - `userinfo.email`
-   - `userinfo.profile`
-6. Click **Save and Continue** through the rest
-
-### Step 4 — Create OAuth credentials
-
-1. **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth client ID**
-2. Application type: **Web application**
-3. Name it (e.g. `nestjs-auth`)
-4. Under **Authorized redirect URIs** add:
-
-   ```
-   # Local development
-   http://localhost:3000/api/auth/google/callback
-
-   # Production
-   https://yourdomain.com/api/auth/google/callback
-   ```
-
-   > This must exactly match `GOOGLE_CALLBACK_URL` in your `.env`
-
-5. Click **Create**
-6. Copy the **Client ID** and **Client Secret**
-
-### Step 5 — Add to .env
-
-```bash
-GOOGLE_CLIENT_ID=123456789-abc.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=GOCSPX-your-secret-here
-GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
-```
-
-### OAuth flow overview
-
-```
-User clicks "Login with Google"
-         │
-         ▼
-GET /api/auth/google
-  → GoogleGuard redirects to:
-    https://accounts.google.com/o/oauth2/auth
-    ?client_id=YOUR_CLIENT_ID
-    &redirect_uri=YOUR_CALLBACK_URL
-    &scope=email profile
-         │
-         ▼
-User approves Google consent screen
-         │
-         ▼
-Google redirects to:
-GET /api/auth/google/callback?code=AUTHORIZATION_CODE
-         │
-         ▼
-GoogleCallbackGuard → GoogleStrategy.validate()
-  → Exchanges code for access token with Google
-  → Fetches user profile from Google
-  → Calls findOrCreateOAuthUser()
-  → Calls oauthLogin()
-  → Returns { user, tokens } to client
-```
-
-### Common errors
-
-| Error                   | Cause                                               | Fix                                                |
-| ----------------------- | --------------------------------------------------- | -------------------------------------------------- |
-| `redirect_uri_mismatch` | Callback URL in `.env` doesn't match Google Console | Ensure exact match including protocol and path     |
-| `invalid_client`        | Wrong Client ID or Secret                           | Double check `.env` values                         |
-| `Access blocked`        | OAuth consent screen not configured                 | Complete Step 3 above                              |
-| `403 access_denied`     | App in testing mode, user not added                 | Add test user in OAuth consent screen → Test users |
-
-> **Testing mode:** While your app is in testing mode on Google Console, only users explicitly added under **OAuth consent screen → Test users** can log in. Publish the app to allow any Google account.
-
----
-
-## Swagger Bearer Auth Setup
-
-To add the lock icon to protected routes in Swagger, two changes are needed.
-
-### 1. Update `api-docs.config.ts`
-
-```typescript
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { INestApplication } from '@nestjs/common';
-
-export function buildAPIDocs(app: INestApplication): void {
-  const config = new DocumentBuilder()
-    .setTitle('Your API')
-    .setDescription('API documentation')
-    .setVersion('1.0')
-    .addBearerAuth(
-      // ← add this
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'Authorization',
-        in: 'header',
-      },
-      'access-token', // ← this is the reference name used in @ApiBearerAuth()
-    )
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
-}
-```
-
-### 2. Add `@ApiBearerAuth()` to protected controllers
-
-```typescript
-import { ApiBearerAuth } from '@nestjs/swagger';
-
-@ApiBearerAuth('access-token')   // ← matches the name in addBearerAuth()
-@Controller('users')
-export class UserController { ... }
-```
-
-```typescript
-@ApiBearerAuth('access-token')
-@Controller('auth')
-export class AuthController { ... }
-```
-
-> Public routes (`@Public()`) will still show the lock icon but will work without a token — Swagger doesn't know about your `@Public()` decorator, only NestJS does.
-
-### How to use in Swagger UI
-
-1. Open `http://localhost:3000/api/docs`
-2. Click **Authorize** button (top right)
-3. Paste your `accessToken` from a login response
-4. Click **Authorize** → **Close**
-5. All routes with the lock icon now send `Authorization: Bearer <token>` automatically
+No changes needed to guards, strategies, or interceptors.

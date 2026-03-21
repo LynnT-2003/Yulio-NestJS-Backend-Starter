@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { buildAPIDocs } from './configs/api-docs.config';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,9 +15,6 @@ async function bootstrap() {
 
   // ─── Trust Proxy (Vercel) ────────────────────────────────────────────────────
   (app as any).set('trust proxy', true);
-
-  // ─── Global Interceptors ──────────────────────────────────────────────────────
-  app.useGlobalInterceptors(new TransformInterceptor());
 
   // ─── Swagger ─────────────────────────────────────────────────────────────────
   buildAPIDocs(app);
