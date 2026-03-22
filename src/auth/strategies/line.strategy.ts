@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-oauth2';
@@ -8,13 +8,48 @@ import { AuthService } from '../auth.service';
 import { UserService } from '../../user/user.service';
 import { OAuthProviderType } from '../../common/enums/oauth-provider.enum';
 import { OAuthUserDto } from '../../user/dto/oauth-user.dto';
+import { UnauthorizedException } from '@nestjs/common';
+
+// Bypasses passport-oauth2 state verification — required for Vercel serverless
+// where there is no persistent session between the redirect and callback requests
+class StatelessStore {
+  store(
+    req: any,
+    callback: (err: any, state: string) => void
+  ): void;
+  store(
+    req: any,
+    meta: any,
+    callback: (err: any, state: string) => void
+  ): void;
+  store(req: any, metaOrCallback: any, callback?: any): void {
+    const cb = callback ?? metaOrCallback;
+    cb(null, 'stateless');
+  }
+
+  verify(
+    req: any,
+    state: string,
+    callback: (err: any, ok: boolean, info?: any) => void
+  ): void;
+  verify(
+    req: any,
+    state: string,
+    meta: any,
+    callback: (err: any, ok: boolean, info?: any) => void
+  ): void;
+  verify(req: any, state: string, metaOrCallback: any, callback?: any): void {
+    const cb = callback ?? metaOrCallback;
+    cb(null, true, 'stateless');
+  }
+}
 
 @Injectable()
 export class LineStrategy extends PassportStrategy(Strategy, 'line') {
   constructor(
     private readonly authService: AuthService,
     private readonly userService: UserService,
-    private readonly configService: ConfigService, // ← add private readonly
+    private readonly configService: ConfigService,
   ) {
     super({
       authorizationURL: 'https://access.line.me/oauth2/v2.1/authorize',
@@ -23,6 +58,7 @@ export class LineStrategy extends PassportStrategy(Strategy, 'line') {
       clientSecret: configService.getOrThrow<string>('LINE_CHANNEL_SECRET'),
       callbackURL: configService.getOrThrow<string>('LINE_CALLBACK_URL'),
       scope: ['profile', 'openid', 'email'],
+      store: new StatelessStore(),  // ← bypasses state
     });
   }
 
@@ -38,7 +74,6 @@ export class LineStrategy extends PassportStrategy(Strategy, 'line') {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      // Read config inside validate — configService is now accessible via this
       const isStrict = this.configService.get('LINE_ACCOUNT_LINKING') !== 'permissive';
 
       if (isStrict && !data.email) {
