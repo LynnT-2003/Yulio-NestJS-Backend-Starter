@@ -7,7 +7,7 @@ Production-ready authentication boilerplate built on NestJS, MongoDB, and Passpo
 | Framework      | NestJS 11                                    |
 | Language       | TypeScript 5                                 |
 | Database       | MongoDB via Mongoose                         |
-| Authentication | Passport.js (local + Google OAuth 2.0 + JWT) |
+| Authentication | Passport.js (local + Google OAuth 2.0 + LINE Login + JWT) |
 | Token Strategy | JWT access token (15m) + refresh token (30d) |
 | Validation     | class-validator + class-transformer          |
 | API Docs       | Swagger (OpenAPI 3.0)                        |
@@ -20,6 +20,7 @@ Production-ready authentication boilerplate built on NestJS, MongoDB, and Passpo
 - [Quick Start](#quick-start)
 - [MongoDB Atlas Setup](#mongodb-atlas-setup)
 - [Google OAuth Setup](#google-oauth-setup)
+- [LINE Login Setup](#line-login-setup)
 - [Environment Variables](#environment-variables)
 - [Vercel Deployment](#vercel-deployment)
 - [Architecture](#architecture)
@@ -42,7 +43,7 @@ npm install
 # 2. Copy environment file
 cp .env.example .env
 
-# 3. Fill in .env (see sections below for MongoDB and Google OAuth)
+# 3. Fill in .env (see sections below for MongoDB, Google OAuth, and LINE Login)
 
 # 4. Run
 npm run start:dev
@@ -196,6 +197,30 @@ GOOGLE_CALLBACK_URL=http://localhost:8080/api/auth/google/callback
 
 ---
 
+## LINE Login Setup
+
+LINE Login uses OAuth 2.0 (`passport-oauth2`) with the same user pipeline as Google: `LineStrategy.validate()` fetches the profile from LINE, builds an `OAuthUserDto`, then `UserService.findOrCreateOAuthUser()` and `AuthService.oauthLogin()` issue JWTs.
+
+**Endpoints**
+
+| Step | Method | Path |
+| --- | --- | --- |
+| Start OAuth | `GET` | `/api/auth/line` → redirects to LINE consent |
+| Callback | `GET` | `/api/auth/line/callback?code=...` → returns `{ user, tokens }` |
+
+**`LINE_CALLBACK_URL`** in `.env` must match **exactly** the callback URL registered in the [LINE Developers Console](https://developers.line.biz/) for your LINE Login channel (e.g. `http://localhost:8080/api/auth/line/callback` locally, `https://your-app.vercel.app/api/auth/line/callback` in production).
+
+**Serverless / Vercel:** `LineStrategy` uses a custom `StatelessStore` so Passport does not rely on session state between the redirect and the callback (each invocation may be a cold start). This trades CSRF protection via OAuth `state` for compatibility with serverless; see `src/auth/strategies/line.strategy.ts`.
+
+**Email and account linking**
+
+- Scopes include `profile`, `openid`, and `email`. Email appears on the profile API only after LINE approves the **email** permission for your channel.
+- **`LINE_ACCOUNT_LINKING`** (default: strict): if not set to `permissive`, missing email triggers `401` with a clear message so you do not silently create users without email when you require it for linking. In `permissive` mode, users can be created with `email: null` (same as Google-only users without email in some setups).
+
+**Full walkthrough** (channel creation, provider, publishing, troubleshooting): see `documentation/LINE.md`.
+
+---
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` and fill in the values.
@@ -229,9 +254,15 @@ JWT_REFRESH_EXPIRES_IN=30d
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_CALLBACK_URL=http://localhost:8080/api/auth/google/callback
+
+# LINE Login (see "LINE Login Setup" and documentation/LINE.md)
+LINE_CHANNEL_ID=
+LINE_CHANNEL_SECRET=
+LINE_CALLBACK_URL=http://localhost:8080/api/auth/line/callback
+LINE_ACCOUNT_LINKING=strict
 ```
 
-All env vars are loaded once via `loadEnvConfigs()` in `src/configs/env.config.ts` and registered through `ConfigModule`. Access them anywhere via `ConfigService`.
+`ConfigModule` exposes `process.env` to Nest (e.g. `ConfigService` in strategies). Shared app config is assembled in `loadEnvConfigs()` in `src/configs/env.config.ts`; OAuth secrets for Google/LINE are read directly from the environment where needed.
 
 ---
 
@@ -247,6 +278,7 @@ In your Vercel project → **Settings** → **Environment Variables**, add every
 | `BASE_URL` | `https://your-app.vercel.app` |
 | `ALLOWED_ORIGINS` | Your frontend domain(s) |
 | `GOOGLE_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/google/callback` |
+| `LINE_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/line/callback` |
 
 ### 2. Push and deploy
 
@@ -290,6 +322,7 @@ The repo includes `vercel.json` — push to your connected branch and Vercel dep
 │  │  AuthService       │─────▶│  UserService          │          │
 │  │  LocalStrategy     │      │  UserEntity           │          │
 │  │  GoogleStrategy    │      └───────────┬───────────┘          │
+│  │  LineStrategy      │                  │                      │
 │  │  JwtStrategy       │                  │                      │
 │  └────────────────────┘                  │                      │
 │                                          ▼                      │
@@ -443,6 +476,31 @@ Client           AuthController    GoogleStrategy      UserService      AuthServ
   │◀──────────────────│ 200 { user, tokens }                │                │
 ```
 
+### LINE Login
+
+```
+Client           AuthController    LineStrategy        UserService      AuthService
+  │                   │                 │                   │                │
+  │ GET /api/auth/line                  │                   │                │
+  │──────────────────▶│                 │                   │                │
+  │◀──────────────────│ 302 → LINE      │                   │                │
+  │                   │                 │                   │                │
+  │  [User approves LINE consent]       │                   │                │
+  │                   │                 │                   │                │
+  │ GET /api/auth/line/callback?code=...                  │                │
+  │──────────────────▶│                 │                   │                │
+  │                   │────────────────▶│                   │                │
+  │                   │                 │ GET /v2/profile   │                │
+  │                   │                 │ (Bearer token)    │                │
+  │                   │                 │ validate() →      │                │
+  │                   │                 │──────────────────▶│ findOrCreate   │
+  │                   │                 │◀──────────────────│ UserDocument   │
+  │                   │                 │ oauthLogin(user)  │                │
+  │                   │                 │──────────────────────────────────▶│
+  │                   │                 │◀──────────────────────────────────│
+  │◀──────────────────│ 200 { user, tokens }                │                │
+```
+
 ### Authenticated Request
 
 ```
@@ -538,7 +596,7 @@ users collection
 
 OAuthProvider subdocument
 ┌─────────────────────────────────────────────────────────┐
-│ provider          OAuthProviderType  'google' | 'local' │
+│ provider          OAuthProviderType  'google' | 'line' | 'local' │
 │ providerId        string             unique per provider│
 │ accessToken       string | null                         │
 └─────────────────────────────────────────────────────────┘
@@ -593,6 +651,8 @@ All responses are wrapped by `TransformInterceptor`:
 | POST | `/api/auth/logout` | JwtGuard | `RefreshTokenDto` | Invalidate refresh token |
 | GET | `/api/auth/google` | Public + GoogleGuard | — | Redirect to Google |
 | GET | `/api/auth/google/callback` | Public + GoogleCallbackGuard | — | OAuth callback |
+| GET | `/api/auth/line` | Public + LineGuard | — | Redirect to LINE |
+| GET | `/api/auth/line/callback` | Public + LineCallbackGuard | — | OAuth callback |
 
 ### User Endpoints
 
@@ -674,7 +734,7 @@ src/
 ├── common/
 │   ├── enums/
 │   │   ├── user-role.enum.ts            USER | ADMIN
-│   │   └── oauth-provider.enum.ts       GOOGLE | LOCAL
+│   │   └── oauth-provider.enum.ts       GOOGLE | LINE | LOCAL
 │   ├── interfaces/
 │   │   ├── user.interface.ts            IUser, IUserPublic, ICurrentUser
 │   │   └── auth.interface.ts            IJwtPayload, IAuthTokens, IAuthResponse
@@ -703,11 +763,14 @@ src/
 │   │   └── refresh-token.dto.ts
 │   ├── strategies/
 │   │   ├── local.strategy.ts            Email + password validation
-│   │   └── google.strategy.ts           OAuth 2.0
+│   │   ├── google.strategy.ts           OAuth 2.0 (Google)
+│   │   └── line.strategy.ts             OAuth 2.0 (LINE; StatelessStore for serverless)
 │   ├── guards/
 │   │   ├── local.guard.ts
 │   │   ├── google.guard.ts
-│   │   └── google-callback.guard.ts
+│   │   ├── google-callback.guard.ts
+│   │   ├── line.guard.ts
+│   │   └── line-callback.guard.ts
 │   ├── auth.service.ts
 │   ├── auth.controller.ts
 │   └── auth.module.ts
