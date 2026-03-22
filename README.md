@@ -1,39 +1,66 @@
-# NestJS Auth Boilerplate
+# NestJS Clean Architecture Setup with Multi-Provider Auth
 
-Production-ready authentication boilerplate built on NestJS, MongoDB, and Passport.js. Designed as a reusable foundation for client projects — clone, configure environment variables, deploy in minutes.
+### Setup Production-Grade Backend with Swagger on Vercel in minutes
 
-Built with one goal: **never re-write auth again.**
+Most projects spend the first two weeks rebuilding the same authentication system
 
----
+Local email/password login, OAuth, token refresh, guards, schemas. Over and over again
 
-## Why this exists
+![Google](https://img.shields.io/badge/Google-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![LINE](https://img.shields.io/badge/LINE-00C300?style=for-the-badge&logo=line&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)
+![Discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)
+![Microsoft](https://img.shields.io/badge/Microsoft-0078D4?style=for-the-badge&logo=microsoft&logoColor=white)
 
-Most projects spend the first two weeks building the same auth system. Local login, Google OAuth, token refresh, role guards, response shaping — the same code, over and over.
+![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
 
-This boilerplate solves that permanently. Every feature a production auth system needs is already here, fully wired, fully typed, ready to extend.
-
----
+Built with one goal: **never re-write auth again**
 
 ## What's included
+
+Production-ready authentication, structured by domain, fully typed, with strict boundaries across every layer.
+
+Built on NestJS, MongoDB, and Passport.js. Every feature a real auth system needs, fully wired, consistent, and ready to extend.
+
+### Vercel-native serverless — deploy free in minutes
+
+Built specifically for Vercel from day one. Not an afterthought. Not a wrapper.
+
+- Cached app instance — cold starts under 600ms
+- Stateless OAuth flows — no session storage needed
+- Exported handler — Vercel picks it up automatically
+- Push to main → live in 30 seconds
+
+```
+git clone → fill .env → vercel --prod → shipped
+```
+
+**Free tier. Zero infrastructure. Zero cost to start.**
 
 ### Multi-provider OAuth — plug and play
 
 Six authentication providers out of the box. Enable only what your client needs — each provider is a self-contained strategy file. Adding a new one takes 30 minutes.
 
-| Provider                 | Package                    | Status                                        |
-| ------------------------ | -------------------------- | --------------------------------------------- |
-| Local (email + password) | `passport-local`           | ✓ Always on                                   |
-| Google                   | `passport-google-oauth20`  | ✓ Ready                                       |
-| LINE                     | `passport-oauth2` (custom) | ✓ Ready — dominant in Thailand, Japan, Taiwan |
-| GitHub                   | `passport-github2`         | ✓ Ready                                       |
-| Discord                  | `passport-discord`         | ✓ Ready                                       |
-| Microsoft                | `passport-microsoft`       | ✓ Ready                                       |
+| Provider                 | Package                   | Status      |
+| ------------------------ | ------------------------- | ----------- |
+| Local (email + password) | `passport-local`          | ✓ Always on |
+| Google                   | `passport-google-oauth20` | ✓ Ready     |
+| LINE                     | `passport-oauth2`         | ✓ Ready     |
+| GitHub                   | `passport-github2`        | ✓ Ready     |
+| Discord                  | `passport-discord`        | ✓ Ready     |
+| Microsoft                | `passport-microsoft`      | ✓ Ready     |
+
+To disable a provider — comment out its strategy and routes. That's it.
 
 ### Account linking — one identity, zero duplicates
 
 The hardest part of multi-provider auth. Solved.
 
-If a user signs up with email/password and later logs in with Google using the same email — they get one account, not two. The system automatically links providers to the same identity.
+If a user signs up with email/password and later logs in with Google using the same email — they get one account, not two. Providers are automatically linked to the same identity.
 
 ```json
 {
@@ -46,6 +73,14 @@ If a user signs up with email/password and later logs in with Google using the s
 }
 ```
 
+### Swagger UI — fully documented, always in sync
+
+Every endpoint is documented. Every request and response schema is typed end to end — not hand-written JSON, not copy-pasted examples. Response DTOs implement TypeScript interfaces directly so docs never drift from reality.
+
+- Grouped by provider — Auth Local, Auth Google, Auth LINE, etc.
+- Bearer auth built in — paste your token once, test everything
+- Live at `/api/docs` — works locally and on Vercel
+
 ### JWT token rotation — production security
 
 - **Access token** — short-lived (15m), stateless, verified on every request
@@ -53,7 +88,7 @@ If a user signs up with email/password and later logs in with Google using the s
 - **Automatic cleanup** — expired tokens pruned from the database on every save
 - **Logout everywhere** — invalidate all refresh tokens in one call
 
-### Clean architecture — built to scale
+### Clean architecture — BUILT TO SCALE
 
 Every layer has a defined contract. Services implement interfaces. DTOs validate input. Controllers do nothing except call services.
 
@@ -100,10 +135,6 @@ getAdminDashboard(@CurrentUser() user: ICurrentUser) { }
 
 Two decorators. That's it.
 
-### Vercel serverless — zero config deploy
-
-Designed for serverless from the ground up. Cached app instance, exported handler, stateless OAuth flows. Push to main, Vercel deploys.
-
 ---
 
 ## Stack
@@ -116,8 +147,8 @@ Designed for serverless from the ground up. Cached app instance, exported handle
 | Authentication | Passport.js — local, Google, LINE, GitHub, Discord, Microsoft |
 | Token strategy | JWT access (15m) + refresh token rotation (30d)               |
 | Validation     | class-validator + class-transformer                           |
-| API docs       | Swagger (OpenAPI 3.0)                                         |
-| Deployment     | Vercel (serverless)                                           |
+| API docs       | Swagger (OpenAPI 3.0) — typed, grouped, always in sync        |
+| Deployment     | Vercel (serverless) — free tier, zero config                  |
 
 ---
 
@@ -888,22 +919,28 @@ export class UserController { ... }
 Controllers use **`@ApiExtraModels`** + **`ApiSuccessResponse` / `ApiErrorResponse`** helpers from `src/common/helpers/swagger.helper.ts` to generate accurate schemas matching `TransformInterceptor` and `HttpExceptionFilter` output.
 
 **DTO organization:**
+
 - **Request DTOs** (`dto/request/`): Used for `@Body()` validation with `class-validator` decorators (`@IsString`, `@IsEmail`, etc.)
 - **Response DTOs** (`dto/response/`): Used for Swagger schema generation with `@ApiProperty` **only** (no validation; they implement interfaces like `IUserPublic`, `IAuthResponse`)
 
 **Example usage:**
 
 ```typescript
-import { ApiSuccessResponse, ApiErrorResponse } from '../common/helpers/swagger.helper';
+import {
+  ApiSuccessResponse,
+  ApiErrorResponse,
+} from '../common/helpers/swagger.helper';
 import { YourModuleDto } from './dto/response';
 
-@ApiExtraModels(YourModuleDto)  // Register for Swagger $ref resolution
+@ApiExtraModels(YourModuleDto) // Register for Swagger $ref resolution
 @Controller('your-module')
 export class YourController {
   @Get()
   @ApiResponse(ApiSuccessResponse(YourModuleDto))
   @ApiResponse(ApiErrorResponse(404, 'Not found'))
-  findAll() { /* ... */ }
+  findAll() {
+    /* ... */
+  }
 }
 ```
 
