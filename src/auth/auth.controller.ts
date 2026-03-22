@@ -28,6 +28,8 @@ import { GithubGuard } from './guards/github.guard';
 import { GithubCallbackGuard } from './guards/github-callback.guard';
 import { DiscordGuard } from './guards/discord.guard';
 import { DiscordCallbackGuard } from './guards/discord-callback.guard';
+import { MicrosoftGuard } from './guards/microsoft.guard';
+import { MicrosoftCallbackGuard } from './guards/microsoft-callback.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -217,6 +219,20 @@ export class AuthController {
   @UseGuards(DiscordCallbackGuard)
   @HttpCode(HttpStatus.OK)
   discordCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
+    return req.user;
+  }
+
+  @Public()
+  @Get('microsoft')
+  @UseGuards(MicrosoftGuard)
+  @HttpCode(HttpStatus.FOUND)
+  microsoftAuth(): void { }
+
+  @Public()
+  @Get('microsoft/callback')
+  @UseGuards(MicrosoftCallbackGuard)
+  @HttpCode(HttpStatus.OK)
+  microsoftCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
     return req.user;
   }
 }

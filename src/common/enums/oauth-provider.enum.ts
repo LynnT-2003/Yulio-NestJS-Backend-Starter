@@ -4,4 +4,5 @@ export enum OAuthProviderType {
     LOCAL = 'local',
     GITHUB = 'github',
     DISCORD = 'discord',
+    MICROSOFT = 'microsoft',
 }
