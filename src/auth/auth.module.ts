@@ -11,6 +11,9 @@ import { JwtStrategy } from '../common/strategies/jwt.strategy';
 import { LocalGuard } from './guards/local.guard';
 import { GoogleGuard } from './guards/google.guard';
 import { GoogleCallbackGuard } from './guards/google-callback.guard';
+import { LineStrategy } from './strategies/line.strategy';
+import { LineGuard } from './guards/line.guard';
+import { LineCallbackGuard } from './guards/line-callback.guard';
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import { GoogleCallbackGuard } from './guards/google-callback.guard';
     LocalGuard,
     GoogleGuard,
     GoogleCallbackGuard,
+    LineStrategy,
+    LineGuard,
+    LineCallbackGuard,
   ],
   exports: [AuthService],
 })

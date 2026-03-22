@@ -22,11 +22,13 @@ import { ICurrentUser } from '../common/interfaces/user.interface';
 import { IAuthResponse } from '../common/interfaces/auth.interface';
 import { UserDocument } from '../user/entity/user.entity';
 import { LoginDto } from './dto/login.dto';
+import { LineGuard } from './guards/line.guard';
+import { LineCallbackGuard } from './guards/line-callback.guard';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
   @Post('register')
@@ -133,7 +135,7 @@ export class AuthController {
   @UseGuards(GoogleGuard)
   @ApiOperation({ summary: 'Initiate Google OAuth login (redirects to Google)' })
   @ApiResponse({ status: 302, description: 'Redirects to Google consent screen' })
-  googleAuth() {}
+  googleAuth() { }
 
   @Public()
   @Get('google/callback')
@@ -163,6 +165,26 @@ export class AuthController {
     },
   })
   googleCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
+    return req.user;
+  }
+
+  @Public()
+  @Get('line')
+  @UseGuards(LineGuard)
+  @HttpCode(HttpStatus.FOUND)
+  lineAuth(): void {
+    // LineGuard handles the redirect to LINE consent screen
+    // this handler body never executes
+  }
+
+  @Public()
+  @Get('line/callback')
+  @UseGuards(LineCallbackGuard)
+  @HttpCode(HttpStatus.OK)
+  lineCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
+    // LineCallbackGuard runs LineStrategy.validate()
+    // which calls findOrCreateOAuthUser + oauthLogin
+    // and attaches the full IAuthResponse to req.user
     return req.user;
   }
 }
