@@ -3,4 +3,5 @@ export enum OAuthProviderType {
     LINE = 'line',
     LOCAL = 'local',
     GITHUB = 'github',
+    DISCORD = 'discord',
 }

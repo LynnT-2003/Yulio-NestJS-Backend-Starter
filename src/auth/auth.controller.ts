@@ -26,6 +26,8 @@ import { LineGuard } from './guards/line.guard';
 import { LineCallbackGuard } from './guards/line-callback.guard';
 import { GithubGuard } from './guards/github.guard';
 import { GithubCallbackGuard } from './guards/github-callback.guard';
+import { DiscordGuard } from './guards/discord.guard';
+import { DiscordCallbackGuard } from './guards/discord-callback.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -201,6 +203,20 @@ export class AuthController {
   @UseGuards(GithubCallbackGuard)
   @HttpCode(HttpStatus.OK)
   githubCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
+    return req.user;
+  }
+
+  @Public()
+  @Get('discord')
+  @UseGuards(DiscordGuard)
+  @HttpCode(HttpStatus.FOUND)
+  discordAuth(): void { }
+
+  @Public()
+  @Get('discord/callback')
+  @UseGuards(DiscordCallbackGuard)
+  @HttpCode(HttpStatus.OK)
+  discordCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
     return req.user;
   }
 }

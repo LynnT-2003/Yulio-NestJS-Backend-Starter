@@ -17,6 +17,9 @@ import { LineCallbackGuard } from './guards/line-callback.guard';
 import { GithubStrategy } from './strategies/github.strategy';
 import { GithubGuard } from './guards/github.guard';
 import { GithubCallbackGuard } from './guards/github-callback.guard';
+import { DiscordStrategy } from './strategies/discord.strategy';
+import { DiscordGuard } from './guards/discord.guard';
+import { DiscordCallbackGuard } from './guards/discord-callback.guard';
 
 @Module({
   imports: [
@@ -39,6 +42,9 @@ import { GithubCallbackGuard } from './guards/github-callback.guard';
     GithubStrategy,
     GithubGuard,
     GithubCallbackGuard,
+    DiscordStrategy,
+    DiscordGuard,
+    DiscordCallbackGuard,
   ],
   exports: [AuthService],
 })
