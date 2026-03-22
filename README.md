@@ -1,4 +1,4 @@
-# NestJS Clean Architecture Setup with Multi-Provider Auth
+# NestJS Clean Architecture & Multi-Provider Auth
 
 ### Setup Production-Grade Backend with Swagger on Vercel in minutes
 
