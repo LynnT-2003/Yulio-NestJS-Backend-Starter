@@ -9,6 +9,7 @@ import { UserService } from '../../user/user.service';
 import { OAuthProviderType } from '../../common/enums/oauth-provider.enum';
 import { OAuthUserDto } from '../../user/dto/oauth-user.dto';
 import { UnauthorizedException } from '@nestjs/common';
+import { IAuthResponse } from '../../common/interfaces/auth.interface';
 
 // Bypasses passport-oauth2 state verification — required for Vercel serverless
 // where there is no persistent session between the redirect and callback requests
@@ -67,39 +68,29 @@ export class LineStrategy extends PassportStrategy(Strategy, 'line') {
     _refreshToken: string,
     _params: any,
     _profile: any,
-    done: (err: any, user?: any) => void,
-  ): Promise<void> {
-    try {
-      const { data } = await axios.get('https://api.line.me/v2/profile', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+  ): Promise<IAuthResponse> {
+    const { data } = await axios.get('https://api.line.me/v2/profile', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
-      const isStrict = this.configService.get('LINE_ACCOUNT_LINKING') !== 'permissive';
+    const isStrict = this.configService.get('LINE_ACCOUNT_LINKING') !== 'permissive';
 
-      if (isStrict && !data.email) {
-        return done(
-          new UnauthorizedException(
-            'LINE email permission is not yet approved. Please try again later.',
-          ),
-          false,
-        );
-      }
-
-      const dto: OAuthUserDto = {
-        provider: OAuthProviderType.LINE,
-        providerId: data.userId,
-        email: data.email ?? null,
-        displayName: data.displayName ?? 'LINE User',
-        avatar: data.pictureUrl ?? null,
-        accessToken,
-      };
-
-      const userDoc = await this.userService.findOrCreateOAuthUser(dto);
-      const authResponse = await this.authService.oauthLogin(userDoc);
-
-      done(null, authResponse);
-    } catch (error) {
-      done(error, false);
+    if (isStrict && !data.email) {
+      throw new UnauthorizedException(
+        'LINE email permission is not yet approved. Please try again later.',
+      );
     }
+
+    const dto: OAuthUserDto = {
+      provider: OAuthProviderType.LINE,
+      providerId: data.userId,
+      email: data.email ?? null,
+      displayName: data.displayName ?? 'LINE User',
+      avatar: data.pictureUrl ?? null,
+      accessToken,
+    };
+
+    const userDoc = await this.userService.findOrCreateOAuthUser(dto);
+    return this.authService.oauthLogin(userDoc);
   }
 }
