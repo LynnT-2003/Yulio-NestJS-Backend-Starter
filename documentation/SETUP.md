@@ -8,7 +8,7 @@ This guide gets you from zero to a fully running app on your Mac. Follow every s
 
 ## What you are setting up
 
-This is the backend server for your app. It handles user accounts, login, Google sign-in, and all your data. Once running, you test everything through a visual interface in your browser called Swagger.
+This is the backend server for your app. It handles user accounts, login, OAuth sign-in (Google, LINE, GitHub, Discord, Microsoft), and all your data. Once running, you test everything through a visual interface in your browser called Swagger.
 
 ---
 
@@ -233,4 +233,4 @@ Open Claude Code and say: `"Fix the errors showing in the terminal"`.
 Open Claude Code and say: `"Revert the last changes you made"`.
 
 **Google login not working**
-See README.md → Google OAuth Setup.
+See README.md → Google OAuth Setup. LINE, GitHub, Discord, Microsoft setup guides: `documentation/{PROVIDER}.md`.

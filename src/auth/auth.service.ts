@@ -9,7 +9,7 @@ import * as bcrypt from 'bcrypt';
 
 import { UserService } from '../user/user.service';
 import { UserDocument } from '../user/entity/user.entity';
-import { RegisterDto } from './dto/register.dto';
+import { RegisterDto } from './dto/request/register.dto';
 import { IAuthService } from './interfaces/auth.service.interface';
 import {
   IAuthResponse,

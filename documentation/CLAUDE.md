@@ -12,7 +12,7 @@ A production-ready NestJS REST API boilerplate with:
 
 - MongoDB via Mongoose
 - JWT authentication (access token 15m + refresh token 30d)
-- Local (email + password) and Google OAuth login
+- Local (email + password) and OAuth login (Google, LINE, GitHub, Discord, Microsoft)
 - Role-based access control (USER | ADMIN)
 - Swagger UI at `/api/docs`
 - Deployed on Vercel (serverless)
@@ -25,7 +25,7 @@ A production-ready NestJS REST API boilerplate with:
 Runtime:        Node.js + TypeScript
 Framework:      NestJS 11
 Database:       MongoDB via @nestjs/mongoose + Mongoose
-Auth:           Passport.js (local, google-oauth20, jwt strategies)
+Auth:           Passport.js (local, google-oauth20, line, github, discord, microsoft, jwt strategies)
 Tokens:         @nestjs/jwt — access + refresh token rotation
 Validation:     class-validator + class-transformer
 API Docs:       Swagger (OpenAPI 3.0) via @nestjs/swagger
@@ -55,7 +55,7 @@ src/
 ├── common/                              Shared across ALL modules
 │   ├── enums/
 │   │   ├── user-role.enum.ts            UserRole: USER | ADMIN
-│   │   ├── oauth-provider.enum.ts       OAuthProviderType: GOOGLE | LOCAL
+│   │   ├── oauth-provider.enum.ts       OAuthProviderType: GOOGLE | LINE | GITHUB | DISCORD | MICROSOFT | LOCAL
 │   │   └── index.ts
 │   ├── interfaces/
 │   │   ├── user.interface.ts            IUser, IUserPublic, ICurrentUser
@@ -73,7 +73,9 @@ src/
 │   ├── filters/
 │   │   └── http-exception.filter.ts     Shapes all error responses
 │   ├── interceptors/
-│   │   └── transform.interceptor.ts     Wraps responses in { success, data, timestamp }
+│   │   └── transform.interceptor.ts     Wraps responses in { success, statusCode, data, timestamp }
+│   ├── helpers/
+│   │   └── swagger.helper.ts            ApiSuccessResponse, ApiErrorResponse (schema generators)
 │   └── pipes/
 │       └── validation.pipe.ts           Global DTO validation
 │
@@ -81,17 +83,43 @@ src/
 │   ├── interfaces/
 │   │   └── auth.service.interface.ts    IAuthService contract
 │   ├── dto/
-│   │   ├── register.dto.ts
-│   │   ├── login.dto.ts
-│   │   ├── refresh-token.dto.ts
+│   │   ├── request/                     HTTP request bodies (validation)
+│   │   │   ├── register.dto.ts
+│   │   │   ├── login.dto.ts
+│   │   │   └── refresh-token.dto.ts
+│   │   ├── response/                    HTTP response bodies (Swagger schemas)
+│   │   │   ├── auth-response.dto.ts     { user, tokens }
+│   │   │   ├── user-public.dto.ts       Public user shape
+│   │   │   ├── auth-tokens.dto.ts       { accessToken, refreshToken }
+│   │   │   └── index.ts
 │   │   └── index.ts
 │   ├── strategies/
 │   │   ├── local.strategy.ts            Email + password
-│   │   └── google.strategy.ts           OAuth 2.0
+│   │   ├── google.strategy.ts           OAuth 2.0 (Google)
+│   │   ├── line.strategy.ts             OAuth 2.0 (LINE; StatelessStore for serverless)
+│   │   ├── github.strategy.ts           passport-github2
+│   │   ├── discord.strategy.ts          passport-discord
+│   │   └── microsoft.strategy.ts        passport-microsoft
 │   ├── guards/
-│   │   ├── local.guard.ts
-│   │   ├── google.guard.ts
-│   │   └── google-callback.guard.ts
+│   │   ├── local/
+│   │   │   └── local.guard.ts
+│   │   ├── google/
+│   │   │   ├── google.guard.ts
+│   │   │   └── google-callback.guard.ts
+│   │   ├── line/
+│   │   │   ├── line.guard.ts
+│   │   │   └── line-callback.guard.ts
+│   │   ├── github/
+│   │   │   ├── github.guard.ts
+│   │   │   └── github-callback.guard.ts
+│   │   ├── discord/
+│   │   │   ├── discord.guard.ts
+│   │   │   └── discord-callback.guard.ts
+│   │   └── microsoft/
+│   │       ├── microsoft.guard.ts
+│   │       └── microsoft-callback.guard.ts
+│   ├── types/
+│   │   └── passport-microsoft.d.ts      Module typings for passport-microsoft
 │   ├── auth.service.ts
 │   ├── auth.controller.ts
 │   └── auth.module.ts
@@ -123,8 +151,12 @@ src/your-module/
   interfaces/
     your-module.service.interface.ts
   dto/
-    create-your-module.dto.ts
-    update-your-module.dto.ts
+    request/                          ← HTTP request bodies (validation)
+      create-your-module.dto.ts
+      update-your-module.dto.ts
+    response/                         ← HTTP response bodies (Swagger schemas)
+      your-module.dto.ts
+      index.ts
     index.ts
   your-module.service.ts
   your-module.controller.ts
@@ -132,6 +164,11 @@ src/your-module/
 ```
 
 Then import the module into `app.module.ts` imports array.
+
+**DTO organization:**
+- **`dto/request/`** — Classes for `@Body()`, `@Query()`, `@Param()` with **validation decorators** (`@IsString`, `@IsNotEmpty`, etc.)
+- **`dto/response/`** — Classes for Swagger response schemas with **`@ApiProperty`** only (no validation)
+- Use **`@ApiExtraModels(...)`** on the controller to register response DTOs for `ApiSuccessResponse()` helper
 
 ### 2. Entity conventions
 
@@ -211,6 +248,10 @@ export class YourService implements IYourModuleService {
 ### 5. Controller conventions
 
 ```typescript
+import { ApiSuccessResponse, ApiErrorResponse } from '../common/helpers/swagger.helper';
+import { YourModuleDto } from './dto/response';
+
+@ApiExtraModels(YourModuleDto)  // register response DTOs for Swagger $ref resolution
 @ApiTags('your-module')
 @ApiBearerAuth('JWT-auth')
 @Controller('your-module')
@@ -220,25 +261,32 @@ export class YourController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new item' })
-  @ApiResponse({ status: 201, description: 'Created' })
+  @ApiResponse(ApiSuccessResponse(YourModuleDto, 201))
+  @ApiResponse(ApiErrorResponse(400, 'Validation failed'))
   create(@CurrentUser() user: ICurrentUser, @Body() dto: CreateDto) {
     return this.yourService.create(user.userId, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'List all items for current user' })
+  @ApiResponse(ApiSuccessResponse(YourModuleDto, 200, true))  // array = true
   findAll(@CurrentUser() user: ICurrentUser) {
     return this.yourService.findAllForUser(user.userId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get item by ID' })
+  @ApiResponse(ApiSuccessResponse(YourModuleDto))
+  @ApiResponse(ApiErrorResponse(404, 'Not found'))
   findOne(@CurrentUser() user: ICurrentUser, @Param('id') id: string) {
     return this.yourService.findById(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update item' })
+  @ApiResponse(ApiSuccessResponse(YourModuleDto))
+  @ApiResponse(ApiErrorResponse(404, 'Not found'))
+  @ApiResponse(ApiErrorResponse(403, 'Forbidden'))
   update(
     @CurrentUser() user: ICurrentUser,
     @Param('id') id: string,
@@ -249,6 +297,8 @@ export class YourController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete item' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse(ApiErrorResponse(404, 'Not found'))
   remove(@CurrentUser() user: ICurrentUser, @Param('id') id: string) {
     return this.yourService.remove(user.userId, id);
   }
@@ -257,12 +307,16 @@ export class YourController {
 
 - All routes are JWT-protected globally — never add `@UseGuards(JwtGuard)`.
 - Use `@Public()` only for unauthenticated routes.
-- Always add `@ApiTags`, `@ApiBearerAuth('JWT-auth')`, and `@ApiOperation` for Swagger.
+- Always add `@ApiTags`, `@ApiBearerAuth('JWT-auth')`, `@ApiOperation`, and `@ApiExtraModels()` for Swagger.
+- Use `ApiSuccessResponse(Dto, statusCode, array?)` and `ApiErrorResponse(code, message)` helpers instead of hand-written schemas.
 
 ### 6. DTO conventions
 
+**Request DTOs** (`dto/request/`) — used for `@Body()`, `@Query()`, `@Param()` validation:
+
 ```typescript
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
 
 export class CreateYourModuleDto {
   @ApiProperty({ example: 'My Project' })
@@ -284,17 +338,37 @@ export class UpdateYourModuleDto {
   @IsString()
   @MaxLength(100)
   name?: string;
-
-  @ApiPropertyOptional({ example: 'Updated description' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  description?: string;
 }
 ```
 
-- Always add `@ApiProperty` (required fields) or `@ApiPropertyOptional` (optional fields) with `example` values.
-- Update DTOs: all fields optional.
+**Response DTOs** (`dto/response/`) — used for Swagger response schemas with `ApiSuccessResponse()`:
+
+```typescript
+import { ApiProperty } from '@nestjs/swagger';
+import { Types } from 'mongoose';
+
+export class YourModuleDto implements IYourModule {
+  @ApiProperty({ example: '665a1b2c3d4e5f6a7b8c9d0e' })
+  _id: Types.ObjectId;
+
+  @ApiProperty({ example: 'My Project' })
+  name: string;
+
+  @ApiProperty({ example: 'Description text', nullable: true })
+  description: string | null;
+
+  @ApiProperty({ example: '2026-03-22T00:00:00.000Z' })
+  createdAt: Date;
+
+  @ApiProperty({ example: '2026-03-22T00:00:00.000Z' })
+  updatedAt: Date;
+}
+```
+
+- **Request DTOs**: `@ApiProperty` + **validation decorators** (`@IsString`, `@MinLength`, etc.)
+- **Response DTOs**: `@ApiProperty` **only** (no validation; used purely for Swagger schema generation)
+- Update DTOs: all fields optional (`@IsOptional()` + `@ApiPropertyOptional`)
+- Response DTOs should **implement** the corresponding interface (e.g., `implements IYourModule`) for type safety
 
 ### 7. Module conventions
 
@@ -442,9 +516,10 @@ The app is cached across warm Vercel invocations. Both paths share the same setu
 □ enum (if needed) → src/common/enums/ → add to index.ts
 □ entity → src/your-module/entity/
 □ service interface → src/your-module/interfaces/
-□ DTOs with @ApiProperty → src/your-module/dto/ → add index.ts barrel
+□ request DTOs with @ApiProperty + validation → src/your-module/dto/request/
+□ response DTOs with @ApiProperty (no validation) → src/your-module/dto/response/
 □ service → implements interface, scopes to user, checks ownership
-□ controller → @ApiTags, @ApiBearerAuth('JWT-auth'), @CurrentUser()
+□ controller → @ApiExtraModels, @ApiTags, @ApiBearerAuth('JWT-auth'), use ApiSuccessResponse/ApiErrorResponse helpers
 □ module → MongooseModule.forFeature, export service if other modules need it
 □ app.module.ts → add to imports array
 □ test in Swagger at /api/docs

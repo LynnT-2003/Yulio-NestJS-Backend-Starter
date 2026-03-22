@@ -28,11 +28,11 @@ const USER_EXAMPLE = {
   updatedAt: '2026-03-22T00:00:00.000Z',
 };
 
-@ApiTags('users')
+@ApiTags('Users')
 @ApiBearerAuth('JWT-auth')
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })

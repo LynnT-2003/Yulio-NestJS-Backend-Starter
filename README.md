@@ -1,17 +1,123 @@
 # NestJS Auth Boilerplate
 
-Production-ready authentication boilerplate built on NestJS, MongoDB, and Passport.js. Designed as a reusable foundation — clone, configure environment variables, deploy.
+Production-ready authentication boilerplate built on NestJS, MongoDB, and Passport.js. Designed as a reusable foundation for client projects — clone, configure environment variables, deploy in minutes.
 
-| Layer          | Technology                                   |
-| -------------- | -------------------------------------------- |
-| Framework      | NestJS 11                                    |
-| Language       | TypeScript 5                                 |
-| Database       | MongoDB via Mongoose                         |
-| Authentication | Passport.js (local + Google, LINE, GitHub, Discord, Microsoft OAuth + JWT) |
-| Token Strategy | JWT access token (15m) + refresh token (30d) |
-| Validation     | class-validator + class-transformer          |
-| API Docs       | Swagger (OpenAPI 3.0)                        |
-| Deployment     | Vercel (serverless)                          |
+Built with one goal: **never re-write auth again.**
+
+---
+
+## Why this exists
+
+Most projects spend the first two weeks building the same auth system. Local login, Google OAuth, token refresh, role guards, response shaping — the same code, over and over.
+
+This boilerplate solves that permanently. Every feature a production auth system needs is already here, fully wired, fully typed, ready to extend.
+
+---
+
+## What's included
+
+### Multi-provider OAuth — plug and play
+
+Six authentication providers out of the box. Enable only what your client needs — each provider is a self-contained strategy file. Adding a new one takes 30 minutes.
+
+| Provider                 | Package                    | Status                                        |
+| ------------------------ | -------------------------- | --------------------------------------------- |
+| Local (email + password) | `passport-local`           | ✓ Always on                                   |
+| Google                   | `passport-google-oauth20`  | ✓ Ready                                       |
+| LINE                     | `passport-oauth2` (custom) | ✓ Ready — dominant in Thailand, Japan, Taiwan |
+| GitHub                   | `passport-github2`         | ✓ Ready                                       |
+| Discord                  | `passport-discord`         | ✓ Ready                                       |
+| Microsoft                | `passport-microsoft`       | ✓ Ready                                       |
+
+### Account linking — one identity, zero duplicates
+
+The hardest part of multi-provider auth. Solved.
+
+If a user signs up with email/password and later logs in with Google using the same email — they get one account, not two. The system automatically links providers to the same identity.
+
+```json
+{
+  "providers": ["local", "google", "github"],
+  "providerDetails": [
+    { "provider": "local", "connectedAt": "2026-01-10T08:00:00.000Z" },
+    { "provider": "google", "connectedAt": "2026-02-14T12:30:00.000Z" },
+    { "provider": "github", "connectedAt": "2026-03-22T09:15:00.000Z" }
+  ]
+}
+```
+
+### JWT token rotation — production security
+
+- **Access token** — short-lived (15m), stateless, verified on every request
+- **Refresh token** — long-lived (30d), stored as bcrypt hash in MongoDB, rotated on every use
+- **Automatic cleanup** — expired tokens pruned from the database on every save
+- **Logout everywhere** — invalidate all refresh tokens in one call
+
+### Clean architecture — built to scale
+
+Every layer has a defined contract. Services implement interfaces. DTOs validate input. Controllers do nothing except call services.
+
+```
+Enum → Interface → Entity → DTO → Service Interface → Service → Controller → Module
+```
+
+Adding a new feature means following the same pattern. Nothing to invent.
+
+### Global response shape — consistent by default
+
+Every response from every endpoint is automatically wrapped:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": {},
+  "timestamp": "2026-03-22T09:15:00.000Z"
+}
+```
+
+Errors too:
+
+```json
+{
+  "success": false,
+  "statusCode": 401,
+  "message": "Invalid email or password",
+  "path": "/api/auth/login",
+  "timestamp": "2026-03-22T09:15:00.000Z"
+}
+```
+
+No manual wrapping. No inconsistent error shapes. Every client gets the same contract.
+
+### Role-based access control — ready to use
+
+```typescript
+@Roles(UserRole.ADMIN)
+@Get('admin/dashboard')
+getAdminDashboard(@CurrentUser() user: ICurrentUser) { }
+```
+
+Two decorators. That's it.
+
+### Vercel serverless — zero config deploy
+
+Designed for serverless from the ground up. Cached app instance, exported handler, stateless OAuth flows. Push to main, Vercel deploys.
+
+---
+
+## Stack
+
+| Layer          | Technology                                                    |
+| -------------- | ------------------------------------------------------------- |
+| Framework      | NestJS 11                                                     |
+| Language       | TypeScript 5                                                  |
+| Database       | MongoDB via Mongoose                                          |
+| Authentication | Passport.js — local, Google, LINE, GitHub, Discord, Microsoft |
+| Token strategy | JWT access (15m) + refresh token rotation (30d)               |
+| Validation     | class-validator + class-transformer                           |
+| API docs       | Swagger (OpenAPI 3.0)                                         |
+| Deployment     | Vercel (serverless)                                           |
 
 ---
 
@@ -134,12 +240,12 @@ Cluster (server)
 
 ### Troubleshooting
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `querySrv ENOTFOUND` | Wrong `MONGO_CLUSTER_URI` | Copy the URI again from Atlas → Connect → Drivers |
-| `Authentication failed` | Wrong credentials | Verify `MONGO_USERNAME` / `MONGO_PASSWORD` match your **Database User** (not Atlas login) |
-| `connection timed out` | IP not allowed | Add your IP in Atlas → Network Access |
-| `mongodb+srv://:@/` | Empty env vars | Ensure `.env` values are filled in |
+| Symptom                 | Cause                     | Fix                                                                                       |
+| ----------------------- | ------------------------- | ----------------------------------------------------------------------------------------- |
+| `querySrv ENOTFOUND`    | Wrong `MONGO_CLUSTER_URI` | Copy the URI again from Atlas → Connect → Drivers                                         |
+| `Authentication failed` | Wrong credentials         | Verify `MONGO_USERNAME` / `MONGO_PASSWORD` match your **Database User** (not Atlas login) |
+| `connection timed out`  | IP not allowed            | Add your IP in Atlas → Network Access                                                     |
+| `mongodb+srv://:@/`     | Empty env vars            | Ensure `.env` values are filled in                                                        |
 
 ---
 
@@ -189,12 +295,12 @@ GOOGLE_CALLBACK_URL=http://localhost:8080/api/auth/google/callback
 
 ### Common errors
 
-| Error | Cause | Fix |
-| --- | --- | --- |
-| `redirect_uri_mismatch` | Callback URL in `.env` doesn't match Google Console | Ensure exact match including protocol and path |
-| `invalid_client` | Wrong Client ID or Secret | Verify `.env` values |
-| `Access blocked` | Consent screen not configured | Complete step 3 above |
-| `403 access_denied` | App in testing mode | Add your Google account under OAuth consent screen → Test users |
+| Error                   | Cause                                               | Fix                                                             |
+| ----------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| `redirect_uri_mismatch` | Callback URL in `.env` doesn't match Google Console | Ensure exact match including protocol and path                  |
+| `invalid_client`        | Wrong Client ID or Secret                           | Verify `.env` values                                            |
+| `Access blocked`        | Consent screen not configured                       | Complete step 3 above                                           |
+| `403 access_denied`     | App in testing mode                                 | Add your Google account under OAuth consent screen → Test users |
 
 ---
 
@@ -204,10 +310,10 @@ LINE Login uses OAuth 2.0 (`passport-oauth2`) with the same user pipeline as Goo
 
 **Endpoints**
 
-| Step | Method | Path |
-| --- | --- | --- |
-| Start OAuth | `GET` | `/api/auth/line` → redirects to LINE consent |
-| Callback | `GET` | `/api/auth/line/callback?code=...` → returns `{ user, tokens }` |
+| Step        | Method | Path                                                            |
+| ----------- | ------ | --------------------------------------------------------------- |
+| Start OAuth | `GET`  | `/api/auth/line` → redirects to LINE consent                    |
+| Callback    | `GET`  | `/api/auth/line/callback?code=...` → returns `{ user, tokens }` |
 
 **`LINE_CALLBACK_URL`** in `.env` must match **exactly** the callback URL registered in the [LINE Developers Console](https://developers.line.biz/) for your LINE Login channel (e.g. `http://localhost:8080/api/auth/line/callback` locally, `https://your-app.vercel.app/api/auth/line/callback` in production).
 
@@ -226,10 +332,10 @@ LINE Login uses OAuth 2.0 (`passport-oauth2`) with the same user pipeline as Goo
 
 These providers use the same pipeline as Google: Passport validates the OAuth profile, `UserService.findOrCreateOAuthUser()` links or creates the user, then `AuthService.oauthLogin()` returns `{ user, tokens }`.
 
-| Provider | Passport strategy | Start | Callback |
-| --- | --- | --- | --- |
-| GitHub | `passport-github2` | `GET /api/auth/github` | `GET /api/auth/github/callback` |
-| Discord | `passport-discord` | `GET /api/auth/discord` | `GET /api/auth/discord/callback` |
+| Provider  | Passport strategy                                            | Start                     | Callback                           |
+| --------- | ------------------------------------------------------------ | ------------------------- | ---------------------------------- |
+| GitHub    | `passport-github2`                                           | `GET /api/auth/github`    | `GET /api/auth/github/callback`    |
+| Discord   | `passport-discord`                                           | `GET /api/auth/discord`   | `GET /api/auth/discord/callback`   |
 | Microsoft | `passport-microsoft` (`tenant: 'common'`, scope `user.read`) | `GET /api/auth/microsoft` | `GET /api/auth/microsoft/callback` |
 
 Register each app’s **redirect URI** to match the corresponding `*_CALLBACK_URL` in `.env` (including `http://localhost:8080/...` for local dev).
@@ -304,15 +410,15 @@ MICROSOFT_CALLBACK_URL=http://localhost:8080/api/auth/microsoft/callback
 
 In your Vercel project → **Settings** → **Environment Variables**, add every variable from `.env.example` with production values. Key differences from local:
 
-| Variable | Production value |
-| --- | --- |
-| `APP_ENVIRONMENT` | `Production` |
-| `BASE_URL` | `https://your-app.vercel.app` |
-| `ALLOWED_ORIGINS` | Your frontend domain(s) |
-| `GOOGLE_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/google/callback` |
-| `LINE_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/line/callback` |
-| `GITHUB_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/github/callback` |
-| `DISCORD_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/discord/callback` |
+| Variable                 | Production value                                          |
+| ------------------------ | --------------------------------------------------------- |
+| `APP_ENVIRONMENT`        | `Production`                                              |
+| `BASE_URL`               | `https://your-app.vercel.app`                             |
+| `ALLOWED_ORIGINS`        | Your frontend domain(s)                                   |
+| `GOOGLE_CALLBACK_URL`    | `https://your-app.vercel.app/api/auth/google/callback`    |
+| `LINE_CALLBACK_URL`      | `https://your-app.vercel.app/api/auth/line/callback`      |
+| `GITHUB_CALLBACK_URL`    | `https://your-app.vercel.app/api/auth/github/callback`    |
+| `DISCORD_CALLBACK_URL`   | `https://your-app.vercel.app/api/auth/discord/callback`   |
 | `MICROSOFT_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/microsoft/callback` |
 
 ### 2. Push and deploy
@@ -702,45 +808,45 @@ All responses are wrapped by `TransformInterceptor`:
 
 ### Auth Endpoints
 
-| Method | Path | Guard | Body | Description |
-| --- | --- | --- | --- | --- |
-| POST | `/api/auth/register` | Public | `RegisterDto` | Create account |
-| POST | `/api/auth/login` | Public + LocalGuard | `LoginDto` | Email/password login |
-| POST | `/api/auth/refresh` | Public | `RefreshTokenDto` | Rotate token pair |
-| POST | `/api/auth/logout` | JwtGuard | `RefreshTokenDto` | Invalidate refresh token |
-| GET | `/api/auth/google` | Public + GoogleGuard | — | Redirect to Google |
-| GET | `/api/auth/google/callback` | Public + GoogleCallbackGuard | — | OAuth callback |
-| GET | `/api/auth/line` | Public + LineGuard | — | Redirect to LINE |
-| GET | `/api/auth/line/callback` | Public + LineCallbackGuard | — | OAuth callback |
-| GET | `/api/auth/github` | Public + GithubGuard | — | Redirect to GitHub |
-| GET | `/api/auth/github/callback` | Public + GithubCallbackGuard | — | OAuth callback |
-| GET | `/api/auth/discord` | Public + DiscordGuard | — | Redirect to Discord |
-| GET | `/api/auth/discord/callback` | Public + DiscordCallbackGuard | — | OAuth callback |
-| GET | `/api/auth/microsoft` | Public + MicrosoftGuard | — | Redirect to Microsoft |
-| GET | `/api/auth/microsoft/callback` | Public + MicrosoftCallbackGuard | — | OAuth callback |
+| Method | Path                           | Guard                           | Body              | Description              |
+| ------ | ------------------------------ | ------------------------------- | ----------------- | ------------------------ |
+| POST   | `/api/auth/register`           | Public                          | `RegisterDto`     | Create account           |
+| POST   | `/api/auth/login`              | Public + LocalGuard             | `LoginDto`        | Email/password login     |
+| POST   | `/api/auth/refresh`            | Public                          | `RefreshTokenDto` | Rotate token pair        |
+| POST   | `/api/auth/logout`             | JwtGuard                        | `RefreshTokenDto` | Invalidate refresh token |
+| GET    | `/api/auth/google`             | Public + GoogleGuard            | —                 | Redirect to Google       |
+| GET    | `/api/auth/google/callback`    | Public + GoogleCallbackGuard    | —                 | OAuth callback           |
+| GET    | `/api/auth/line`               | Public + LineGuard              | —                 | Redirect to LINE         |
+| GET    | `/api/auth/line/callback`      | Public + LineCallbackGuard      | —                 | OAuth callback           |
+| GET    | `/api/auth/github`             | Public + GithubGuard            | —                 | Redirect to GitHub       |
+| GET    | `/api/auth/github/callback`    | Public + GithubCallbackGuard    | —                 | OAuth callback           |
+| GET    | `/api/auth/discord`            | Public + DiscordGuard           | —                 | Redirect to Discord      |
+| GET    | `/api/auth/discord/callback`   | Public + DiscordCallbackGuard   | —                 | OAuth callback           |
+| GET    | `/api/auth/microsoft`          | Public + MicrosoftGuard         | —                 | Redirect to Microsoft    |
+| GET    | `/api/auth/microsoft/callback` | Public + MicrosoftCallbackGuard | —                 | OAuth callback           |
 
 ### User Endpoints
 
-| Method | Path | Guard | Body | Description |
-| --- | --- | --- | --- | --- |
-| GET | `/api/users/me` | JwtGuard | — | Get own profile |
-| PATCH | `/api/users/me` | JwtGuard | `UpdateUserDto` | Update profile |
-| DELETE | `/api/users/me` | JwtGuard | — | Delete account |
-| GET | `/api/users/admin` | JwtGuard + `@Roles(ADMIN)` | — | Admin-only route |
+| Method | Path               | Guard                      | Body            | Description      |
+| ------ | ------------------ | -------------------------- | --------------- | ---------------- |
+| GET    | `/api/users/me`    | JwtGuard                   | —               | Get own profile  |
+| PATCH  | `/api/users/me`    | JwtGuard                   | `UpdateUserDto` | Update profile   |
+| DELETE | `/api/users/me`    | JwtGuard                   | —               | Delete account   |
+| GET    | `/api/users/admin` | JwtGuard + `@Roles(ADMIN)` | —               | Admin-only route |
 
 ---
 
 ## Security Model
 
-| Layer | Implementation |
-| --- | --- |
-| Transport | HTTPS enforced via Vercel edge |
-| Input validation | class-validator with whitelist and `forbidNonWhitelisted` |
-| Authentication | JWT access token — 15 min expiry, signed with `JWT_ACCESS_SECRET` |
-| Refresh tokens | 30 day expiry, stored as bcrypt hash in MongoDB, rotated on every use |
-| Passwords | bcrypt (10 salt rounds), `select: false` on schema |
-| Authorization | Role-based via `@Roles()` + `RolesGuard`, checked after JWT validation |
-| Data exposure | `password` and `refreshTokens` excluded from queries via `select: false`; `IUserPublic` strips sensitive fields; OAuth providers expose name only |
+| Layer            | Implementation                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transport        | HTTPS enforced via Vercel edge                                                                                                                    |
+| Input validation | class-validator with whitelist and `forbidNonWhitelisted`                                                                                         |
+| Authentication   | JWT access token — 15 min expiry, signed with `JWT_ACCESS_SECRET`                                                                                 |
+| Refresh tokens   | 30 day expiry, stored as bcrypt hash in MongoDB, rotated on every use                                                                             |
+| Passwords        | bcrypt (10 salt rounds), `select: false` on schema                                                                                                |
+| Authorization    | Role-based via `@Roles()` + `RolesGuard`, checked after JWT validation                                                                            |
+| Data exposure    | `password` and `refreshTokens` excluded from queries via `select: false`; `IUserPublic` strips sensitive fields; OAuth providers expose name only |
 
 ---
 
@@ -771,11 +877,37 @@ export class UserController { ... }
 
 1. Open `http://localhost:8080/api/docs`
 2. Click **Authorize** (top right)
-3. Paste the `accessToken` from a login/register response
+3. Paste the `accessToken` from the **`data.tokens.accessToken`** field in a login/register response (responses are wrapped: `{ success, statusCode, data: { user, tokens }, timestamp }`)
 4. Click **Authorize** → **Close**
 5. All protected routes now send `Authorization: Bearer <token>` automatically
 
 > Routes marked `@Public()` still show the lock icon in Swagger but work without a token.
+
+### Response schema generation
+
+Controllers use **`@ApiExtraModels`** + **`ApiSuccessResponse` / `ApiErrorResponse`** helpers from `src/common/helpers/swagger.helper.ts` to generate accurate schemas matching `TransformInterceptor` and `HttpExceptionFilter` output.
+
+**DTO organization:**
+- **Request DTOs** (`dto/request/`): Used for `@Body()` validation with `class-validator` decorators (`@IsString`, `@IsEmail`, etc.)
+- **Response DTOs** (`dto/response/`): Used for Swagger schema generation with `@ApiProperty` **only** (no validation; they implement interfaces like `IUserPublic`, `IAuthResponse`)
+
+**Example usage:**
+
+```typescript
+import { ApiSuccessResponse, ApiErrorResponse } from '../common/helpers/swagger.helper';
+import { YourModuleDto } from './dto/response';
+
+@ApiExtraModels(YourModuleDto)  // Register for Swagger $ref resolution
+@Controller('your-module')
+export class YourController {
+  @Get()
+  @ApiResponse(ApiSuccessResponse(YourModuleDto))
+  @ApiResponse(ApiErrorResponse(404, 'Not found'))
+  findAll() { /* ... */ }
+}
+```
+
+This ensures Swagger schemas always match what `TransformInterceptor` wraps: `{ success, statusCode, data: T, timestamp }`.
 
 ---
 
@@ -815,7 +947,9 @@ src/
 │   ├── filters/
 │   │   └── http-exception.filter.ts     Consistent error response shape
 │   ├── interceptors/
-│   │   └── transform.interceptor.ts     Wraps all responses in { success, data }
+│   │   └── transform.interceptor.ts     Wraps all responses in { success, statusCode, data, timestamp }
+│   ├── helpers/
+│   │   └── swagger.helper.ts            ApiSuccessResponse, ApiErrorResponse (schema generators)
 │   └── pipes/
 │       └── validation.pipe.ts           Global DTO validation
 │
@@ -823,9 +957,16 @@ src/
 │   ├── interfaces/
 │   │   └── auth.service.interface.ts    IAuthService contract
 │   ├── dto/
-│   │   ├── register.dto.ts
-│   │   ├── login.dto.ts
-│   │   └── refresh-token.dto.ts
+│   │   ├── request/                     HTTP request bodies (validation)
+│   │   │   ├── register.dto.ts
+│   │   │   ├── login.dto.ts
+│   │   │   └── refresh-token.dto.ts
+│   │   ├── response/                    HTTP response bodies (Swagger schemas)
+│   │   │   ├── auth-response.dto.ts     { user, tokens }
+│   │   │   ├── user-public.dto.ts       Public user shape
+│   │   │   ├── auth-tokens.dto.ts       { accessToken, refreshToken }
+│   │   │   └── index.ts
+│   │   └── index.ts
 │   ├── strategies/
 │   │   ├── local.strategy.ts            Email + password validation
 │   │   ├── google.strategy.ts           OAuth 2.0 (Google)
@@ -834,17 +975,23 @@ src/
 │   │   ├── discord.strategy.ts          passport-discord
 │   │   └── microsoft.strategy.ts        passport-microsoft
 │   ├── guards/
-│   │   ├── local.guard.ts
-│   │   ├── google.guard.ts
-│   │   ├── google-callback.guard.ts
-│   │   ├── line.guard.ts
-│   │   ├── line-callback.guard.ts
-│   │   ├── github.guard.ts
-│   │   ├── github-callback.guard.ts
-│   │   ├── discord.guard.ts
-│   │   ├── discord-callback.guard.ts
-│   │   ├── microsoft.guard.ts
-│   │   └── microsoft-callback.guard.ts
+│   │   ├── local/
+│   │   │   └── local.guard.ts
+│   │   ├── google/
+│   │   │   ├── google.guard.ts
+│   │   │   └── google-callback.guard.ts
+│   │   ├── line/
+│   │   │   ├── line.guard.ts
+│   │   │   └── line-callback.guard.ts
+│   │   ├── github/
+│   │   │   ├── github.guard.ts
+│   │   │   └── github-callback.guard.ts
+│   │   ├── discord/
+│   │   │   ├── discord.guard.ts
+│   │   │   └── discord-callback.guard.ts
+│   │   └── microsoft/
+│   │       ├── microsoft.guard.ts
+│   │       └── microsoft-callback.guard.ts
 │   ├── types/
 │   │   └── passport-microsoft.d.ts      Module typings for passport-microsoft
 │   ├── auth.service.ts

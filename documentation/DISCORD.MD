@@ -51,6 +51,20 @@ DiscordCallbackGuard → DiscordStrategy.validate()
   → returns { user, tokens } to client
 ```
 
+**Note:** The actual HTTP response is wrapped by `TransformInterceptor`:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": {
+    "user": { /* IUserPublic */ },
+    "tokens": { "accessToken": "...", "refreshToken": "..." }
+  },
+  "timestamp": "2026-03-22T00:00:00.000Z"
+}
+```
+
 ---
 
 ## Sequence Diagram

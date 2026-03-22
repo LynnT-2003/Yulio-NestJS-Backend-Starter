@@ -1,4 +1,6 @@
 declare module 'passport-microsoft' {
+
+  // passport-microsoft doesn't have @types, so we need to create our own types for the strategy
   import { Strategy as OAuth2Strategy } from 'passport-oauth2';
 
   interface Profile {

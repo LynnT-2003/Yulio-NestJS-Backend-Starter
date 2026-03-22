@@ -1,143 +1,146 @@
-# EasyDeal Backend - Vercel Deployment Guide
+# NestJS Auth Boilerplate
 
-This guide will walk you through deploying the EasyDeal NestJS backend to Vercel.
+Production-ready authentication boilerplate built on NestJS, MongoDB, and Passport.js. Designed as a reusable foundation for client projects — clone, configure environment variables, deploy in minutes.
 
-## Prerequisites
+Built with one goal: **never write auth again.**
 
-- [Vercel account](https://vercel.com/signup)
-- [Vercel CLI](https://vercel.com/cli) installed (optional, for CLI deployment)
-- Firebase project with Admin SDK credentials
+> **Free to deploy. Ships in minutes. Runs on Vercel.**
 
-## Deployment Options
+---
 
-### Option 1: Deploy via Vercel Dashboard (Recommended for first deployment)
+## Why this exists
 
-1. **Push your code to GitHub**
+Most projects spend the first two weeks building the same auth system. Local login, Google OAuth, token refresh, role guards, response shaping — the same code, over and over, every project.
 
-   ```bash
-   git add .
-   git commit -m "Add Vercel deployment configuration"
-   git push origin main
-   ```
+This boilerplate kills that permanently. Clone it, drop in your environment variables, push to Vercel. Done. Free tier. No servers. No DevOps.
 
-2. **Import project in Vercel**
-   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
-   - Click "Add New" → "Project"
-   - Import your GitHub repository
-   - Vercel will auto-detect it as a Node.js project
+---
 
-3. **Configure environment variables**
-   - In the project settings, go to "Environment Variables"
-   - Add the following variables (copy from your local `.env` file):
-     - `FIREBASE_PROJECT_ID`
-     - `FIREBASE_PRIVATE_KEY` (paste the entire private key including BEGIN/END markers)
-     - `FIREBASE_CLIENT_EMAIL`
-     - `NODE_ENV` = `production`
-     - `FRONTEND_URL` = `https://your-frontend-domain.vercel.app` (your actual frontend URL)
+## What's included
 
-4. **Deploy**
-   - Click "Deploy"
-   - Wait for build to complete (usually 1-2 minutes)
+### Vercel-native serverless — deploy free in minutes
 
-### Option 2: Deploy via Vercel CLI
+Built specifically for Vercel from day one. Not an afterthought. Not a wrapper.
 
-1. **Install Vercel CLI** (if not already installed)
-
-   ```bash
-   npm i -g vercel
-   ```
-
-2. **Login to Vercel**
-
-   ```bash
-   vercel login
-   ```
-
-3. **Deploy**
-
-   ```bash
-   vercel
-   ```
-
-   - Follow the prompts
-   - Link to existing project or create new one
-   - Set environment variables when prompted
-
-4. **Set environment variables** (if not done during deployment)
-
-   ```bash
-   vercel env add FIREBASE_PROJECT_ID
-   vercel env add FIREBASE_PRIVATE_KEY
-   vercel env add FIREBASE_CLIENT_EMAIL
-   vercel env add NODE_ENV
-   vercel env add FRONTEND_URL
-   ```
-
-5. **Deploy to production**
-   ```bash
-   vercel --prod
-   ```
-
-## Post-Deployment
-
-### Access Your API
-
-Once deployed, your API will be available at:
+- Cached app instance — cold starts under 600ms
+- Stateless OAuth flows — no session storage needed
+- Exported handler — Vercel picks it up automatically
+- Push to main → live in 30 seconds
 
 ```
-https://your-project-name.vercel.app
+git clone → fill .env → vercel --prod → shipped
 ```
 
-### Access Swagger Documentation
+**Free tier. Zero infrastructure. Zero cost to start.**
 
-The Swagger UI will be accessible at:
+### Multi-provider OAuth — plug and play
+
+Six authentication providers out of the box. Enable only what your client needs — each provider is a self-contained strategy file. Adding a new one takes 30 minutes.
+
+| Provider                 | Package                    | Status                                        |
+| ------------------------ | -------------------------- | --------------------------------------------- |
+| Local (email + password) | `passport-local`           | ✓ Always on                                   |
+| Google                   | `passport-google-oauth20`  | ✓ Ready                                       |
+| LINE                     | `passport-oauth2` (custom) | ✓ Ready — dominant in Thailand, Japan, Taiwan |
+| GitHub                   | `passport-github2`         | ✓ Ready                                       |
+| Discord                  | `passport-discord`         | ✓ Ready                                       |
+| Microsoft                | `passport-microsoft`       | ✓ Ready                                       |
+
+To disable a provider — comment out its strategy and routes. That's it.
+
+### Account linking — one identity, zero duplicates
+
+The hardest part of multi-provider auth. Solved.
+
+If a user signs up with email/password and later logs in with Google using the same email — they get one account, not two. Providers are automatically linked to the same identity.
+
+```json
+{
+  "providers": ["local", "google", "github"],
+  "providerDetails": [
+    { "provider": "local", "connectedAt": "2026-01-10T08:00:00.000Z" },
+    { "provider": "google", "connectedAt": "2026-02-14T12:30:00.000Z" },
+    { "provider": "github", "connectedAt": "2026-03-22T09:15:00.000Z" }
+  ]
+}
+```
+
+### Swagger UI — fully documented, always in sync
+
+Every endpoint is documented. Every request and response schema is typed end to end — not hand-written JSON, not copy-pasted examples. Response DTOs implement TypeScript interfaces directly so docs never drift from reality.
+
+- Grouped by provider — Auth Local, Auth Google, Auth LINE, etc.
+- Bearer auth built in — paste your token once, test everything
+- Live at `/api/docs` — works locally and on Vercel
+
+### JWT token rotation — production security
+
+- **Access token** — short-lived (15m), stateless, verified on every request
+- **Refresh token** — long-lived (30d), stored as bcrypt hash in MongoDB, rotated on every use
+- **Automatic cleanup** — expired tokens pruned from the database on every save
+- **Logout everywhere** — invalidate all refresh tokens in one call
+
+### Clean architecture — built to scale
+
+Every layer has a defined contract. Services implement interfaces. DTOs validate input. Controllers do nothing except call services.
 
 ```
-https://your-project-name.vercel.app/api/docs
+Enum → Interface → Entity → DTO → Service Interface → Service → Controller → Module
 ```
 
-The Swagger documentation includes:
+Adding a new feature means following the same pattern. Nothing to invent.
 
-- Interactive API testing
-- Full endpoint documentation
-- Request/response examples
-- Authentication configuration (Bearer JWT)
+### Global response shape — consistent by default
 
-### Test Your Deployment
+Every response from every endpoint is automatically wrapped:
 
-1. **Health Check**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": {},
+  "timestamp": "2026-03-22T09:15:00.000Z"
+}
+```
 
-   ```bash
-   curl https://your-project-name.vercel.app
-   ```
+Errors too:
 
-   Should return: `"Hello World!"`
+```json
+{
+  "success": false,
+  "statusCode": 401,
+  "message": "Invalid email or password",
+  "path": "/api/auth/login",
+  "timestamp": "2026-03-22T09:15:00.000Z"
+}
+```
 
-2. **Swagger Docs**
-   Visit `https://your-project-name.vercel.app/api/docs` in your browser
+No manual wrapping. No inconsistent error shapes. Every client gets the same contract.
 
-3. **Test Authentication**
-   - Get a Firebase ID token from your frontend
-   - Use Swagger UI to test the `/auth/verify` endpoint
+### Role-based access control — ready to use
 
-## CORS Configuration
+```typescript
+@Roles(UserRole.ADMIN)
+@Get('admin/dashboard')
+getAdminDashboard(@CurrentUser() user: ICurrentUser) { }
+```
 
-The backend is configured to accept requests from:
+Two decorators. That's it.
 
-- The URL specified in `FRONTEND_URL` environment variable
-- Or `*` (all origins) if `FRONTEND_URL` is not set
+---
 
-**Important**: In production, always set `FRONTEND_URL` to your actual frontend domain for security.
+## Stack
 
-## Environment Variables Reference
-
-| Variable                | Description                    | Example                            |
-| ----------------------- | ------------------------------ | ---------------------------------- |
-| `FIREBASE_PROJECT_ID`   | Firebase project ID            | `easydeal-f0091`                   |
-| `FIREBASE_PRIVATE_KEY`  | Firebase Admin SDK private key | `-----BEGIN PRIVATE KEY-----\n...` |
-| `FIREBASE_CLIENT_EMAIL` | Firebase service account email | `firebase-adminsdk-xxxxx@...`      |
-| `NODE_ENV`              | Environment mode               | `production`                       |
-| `FRONTEND_URL`          | Frontend URL for CORS          | `https://your-app.vercel.app`      |
+| Layer          | Technology                                                    |
+| -------------- | ------------------------------------------------------------- |
+| Framework      | NestJS 11                                                     |
+| Language       | TypeScript 5                                                  |
+| Database       | MongoDB via Mongoose                                          |
+| Authentication | Passport.js — local, Google, LINE, GitHub, Discord, Microsoft |
+| Token strategy | JWT access (15m) + refresh token rotation (30d)               |
+| Validation     | class-validator + class-transformer                           |
+| API docs       | Swagger (OpenAPI 3.0) — typed, grouped, always in sync        |
+| Deployment     | Vercel (serverless) — free tier, zero config                  |
 
 ## Troubleshooting
 

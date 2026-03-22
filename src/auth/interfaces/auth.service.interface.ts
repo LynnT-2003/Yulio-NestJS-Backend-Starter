@@ -1,5 +1,5 @@
 import { UserDocument } from '../../user/entity/user.entity';
-import { RegisterDto } from '../dto/register.dto';
+import { RegisterDto } from '../dto/request/register.dto';
 import { IAuthResponse, IAuthTokens } from '../../common/interfaces/auth.interface';
 
 export interface IAuthService {

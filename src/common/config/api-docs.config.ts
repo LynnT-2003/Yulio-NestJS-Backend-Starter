@@ -6,6 +6,31 @@ export function buildAPIDocs(app: INestApplication): void {
     .setTitle('NestJS API Template')
     .setDescription('API documentation for NestJS API Template')
     .setVersion('1.0')
+    .addTag(
+      'Auth - Local',
+      'Email/password: register, login, token refresh, and logout.',
+    )
+    .addTag(
+      'Auth - Google',
+      'Google OAuth 2.0: GET /auth/google redirects to Google; callback returns JWTs.',
+    )
+    .addTag(
+      'Auth - Line',
+      'LINE Login: GET /auth/line redirects to LINE; callback returns JWTs (serverless-friendly state).',
+    )
+    .addTag(
+      'Auth - Github',
+      'GitHub OAuth: GET /auth/github redirects; callback returns JWTs.',
+    )
+    .addTag(
+      'Auth - Discord',
+      'Discord OAuth: GET /auth/discord redirects; callback returns JWTs.',
+    )
+    .addTag(
+      'Auth - Microsoft',
+      'Microsoft Entra ID OAuth: GET /auth/microsoft redirects; callback returns JWTs.',
+    )
+    .addTag('Users', 'Authenticated user profile and admin-only routes.')
     .addBearerAuth(
       {
         type: 'http',
