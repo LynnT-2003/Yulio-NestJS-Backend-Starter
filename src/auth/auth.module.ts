@@ -14,6 +14,9 @@ import { GoogleCallbackGuard } from './guards/google-callback.guard';
 import { LineStrategy } from './strategies/line.strategy';
 import { LineGuard } from './guards/line.guard';
 import { LineCallbackGuard } from './guards/line-callback.guard';
+import { GithubStrategy } from './strategies/github.strategy';
+import { GithubGuard } from './guards/github.guard';
+import { GithubCallbackGuard } from './guards/github-callback.guard';
 
 @Module({
   imports: [
@@ -33,6 +36,9 @@ import { LineCallbackGuard } from './guards/line-callback.guard';
     LineStrategy,
     LineGuard,
     LineCallbackGuard,
+    GithubStrategy,
+    GithubGuard,
+    GithubCallbackGuard,
   ],
   exports: [AuthService],
 })

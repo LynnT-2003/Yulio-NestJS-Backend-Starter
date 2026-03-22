@@ -24,6 +24,8 @@ import { UserDocument } from '../user/entity/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { LineGuard } from './guards/line.guard';
 import { LineCallbackGuard } from './guards/line-callback.guard';
+import { GithubGuard } from './guards/github.guard';
+import { GithubCallbackGuard } from './guards/github-callback.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -185,6 +187,20 @@ export class AuthController {
     // LineCallbackGuard runs LineStrategy.validate()
     // which calls findOrCreateOAuthUser + oauthLogin
     // and attaches the full IAuthResponse to req.user
+    return req.user;
+  }
+
+  @Public()
+  @Get('github')
+  @UseGuards(GithubGuard)
+  @HttpCode(HttpStatus.FOUND)
+  githubAuth(): void { }
+
+  @Public()
+  @Get('github/callback')
+  @UseGuards(GithubCallbackGuard)
+  @HttpCode(HttpStatus.OK)
+  githubCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
     return req.user;
   }
 }
