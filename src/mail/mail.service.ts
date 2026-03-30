@@ -25,7 +25,11 @@ export class MailService implements IMailService {
       },
     });
     this.companyName = this.configService.get<string>('COMPANY_NAME') ?? 'AuthForge';
-    this.logoUrl = this.configService.get<string>('LOGO_URL') ?? '';
+    // Prefer COMPANY_LOGO_URL (new), fallback to LOGO_URL (legacy)
+    this.logoUrl =
+      this.configService.get<string>('COMPANY_LOGO_URL') ??
+      this.configService.get<string>('LOGO_URL') ??
+      '';
     this.from = this.configService.get<string>('MAIL_FROM') ?? `${this.companyName} <noreply@authforge.dev>`;
   }
 

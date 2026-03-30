@@ -9,6 +9,18 @@ export function baseEmailTemplate({
   logoUrl,
   content,
 }: BaseTemplateOptions): string {
+  const logoHtml = logoUrl
+    ? `
+      <img
+        src="${logoUrl}"
+        alt="${companyName}"
+        width="36"
+        height="36"
+        style="display:inline-block;vertical-align:middle;border-radius:6px;margin-right:10px;"
+      />
+    `.trim()
+    : '';
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -29,13 +41,7 @@ export function baseEmailTemplate({
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
                   <td>
-                    <img
-                      src="${logoUrl}"
-                      alt="${companyName}"
-                      width="36"
-                      height="36"
-                      style="display:inline-block;vertical-align:middle;border-radius:6px;margin-right:10px;"
-                    />
+                    ${logoHtml}
                     <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.3px;">
                       ${companyName}
                     </span>

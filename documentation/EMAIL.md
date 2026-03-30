@@ -19,9 +19,11 @@ Optional:
 
 - `COMPANY_NAME`
   - Used for branding in email subjects and the base email wrapper (defaults to `AuthForge`).
-- `LOGO_URL`
+- `COMPANY_LOGO_URL`
   - Used in the base email wrapper header. Recommended to point to a publicly reachable image URL.
   - If you are hosting static assets from this API, you can use: `${BASE_URL}/assets/<your-image>`
+- `LOGO_URL`
+  - Legacy alias for `COMPANY_LOGO_URL`.
 - `VERIFY_REDIRECT_URL`
   - If set, `GET /api/auth/verify-email?token=...` will redirect the browser to this URL after verification.
   - If not set, it returns the default JSON success response.

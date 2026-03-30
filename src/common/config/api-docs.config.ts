@@ -48,8 +48,6 @@ export function buildAPIDocs(app: INestApplication): void {
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
-      customSiteTitle: 'Yulio API',
-      customfavIcon: '/assets/yulio.jpeg',
     },
     customCssUrl: [
       'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css',
