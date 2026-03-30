@@ -111,4 +111,47 @@ export class UserRepo {
       { $set: { refreshTokens: [] } },
     );
   }
+
+  // ─── Email Verification Management ────────────────────────────────────────
+
+  async saveEmailVerificationToken(
+    id: string | Types.ObjectId,
+    hashedToken: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: id },
+      {
+        $set: {
+          emailVerificationToken: hashedToken,
+          emailVerificationExpiresAt: expiresAt,
+        },
+      },
+    ).exec();
+  }
+
+  async findByVerificationToken(
+    hashedToken: string,
+  ): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({
+        emailVerificationToken: hashedToken,
+        emailVerificationExpiresAt: { $gt: new Date() },
+      })
+      .select('+emailVerificationToken')
+      .exec();
+  }
+
+  async markEmailVerified(id: string | Types.ObjectId): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: id },
+      {
+        $set: {
+          isEmailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null,
+        },
+      },
+    ).exec();
+  }
 }

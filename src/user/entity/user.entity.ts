@@ -102,6 +102,12 @@ export class User {
     @Prop({ type: Boolean, default: false })
     isEmailVerified: boolean;
 
+    @Prop({ type: String, default: null, select: false })
+    emailVerificationToken: string | null;
+
+    @Prop({ type: Date, default: null })
+    emailVerificationExpiresAt: Date | null;
+
     // Injected by timestamps: true
     createdAt: Date;
     updatedAt: Date;

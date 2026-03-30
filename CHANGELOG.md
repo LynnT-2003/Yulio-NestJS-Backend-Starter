@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(No unreleased changes — latest patch notes below.)_
+
+---
+
+## [2026-03-30]
+
+### Added
+- Added consistent Swagger response documentation for `GET /api/auth/verify-email` and introduced `EmailResponseDto`.
+- Added `documentation/EMAIL.md` to document SMTP configuration and email verification setup for non-technical users.
+
+---
+
+## [2026-03-28]
+
 ### Added
 - Created a dedicated repository layer (`src/user/user.repo.ts`) to securely encapsulate MongoDB operations from business logic.
 - Implemented environment-driven token limits utilizing `MAX_SESSIONS` via `ConfigService`.

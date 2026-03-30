@@ -29,6 +29,8 @@ export interface IUser {
     providers: IOAuthProvider[];
     refreshTokens: IRefreshToken[];
     isEmailVerified: boolean;
+    emailVerificationToken: string | null;
+    emailVerificationExpiresAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }

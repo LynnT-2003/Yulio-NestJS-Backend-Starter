@@ -190,4 +190,20 @@ export class UserService implements IUserService {
       updatedAt: user.updatedAt,
     };
   }
+
+  async saveEmailVerificationToken(
+    id: string | Types.ObjectId,
+    hashedToken: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.userRepo.saveEmailVerificationToken(id, hashedToken, expiresAt);
+  }
+  
+  async findByVerificationToken(hashedToken: string): Promise<UserDocument | null> {
+    return this.userRepo.findByVerificationToken(hashedToken);
+  }
+  
+  async markEmailVerified(id: string | Types.ObjectId): Promise<void> {
+    await this.userRepo.markEmailVerified(id);
+  }
 }

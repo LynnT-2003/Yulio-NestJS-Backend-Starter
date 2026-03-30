@@ -14,7 +14,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/request/register.dto';
 import { LoginDto } from './dto/request/login.dto';
 import { RefreshTokenDto } from './dto/request/refresh-token.dto';
-import { AuthResponseDto, AuthTokensDto, UserPublicDto } from './dto/response';
+import { AuthResponseDto, AuthTokensDto, EmailResponseDto, UserPublicDto } from './dto/response';
 import { ApiSuccessResponse, ApiErrorResponse } from '../common/helpers/swagger.helper';
 import { LocalGuard } from './guards/local/local.guard';
 import { GoogleGuard } from './guards/google/google.guard';
@@ -32,11 +32,15 @@ import { DiscordGuard } from './guards/discord/discord.guard';
 import { DiscordCallbackGuard } from './guards/discord/discord-callback.guard';
 import { MicrosoftGuard } from './guards/microsoft/microsoft.guard';
 import { MicrosoftCallbackGuard } from './guards/microsoft/microsoft-callback.guard';
+import { Query, Res } from '@nestjs/common';
+import { Response } from 'express';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { UserService } from '../user/user.service';
 
-@ApiExtraModels(AuthResponseDto, AuthTokensDto, UserPublicDto)
+@ApiExtraModels(AuthResponseDto, AuthTokensDto, EmailResponseDto, UserPublicDto)
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService, private readonly userService: UserService) { }
 
   @Public()
   @ApiTags('Auth - Local')
@@ -87,6 +91,55 @@ export class AuthController {
     @CurrentUser() user: ICurrentUser,
   ): Promise<void> {
     return this.authService.logout(user.userId, dto.refreshToken);
+  }
+
+  @Public()
+  @ApiTags('Auth - Local')
+  @Get('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email address via token from email link' })
+  @ApiResponse({ status: 302, description: 'Redirects to VERIFY_REDIRECT_URL (when configured)' })
+  @ApiResponse(ApiSuccessResponse(EmailResponseDto))
+  @ApiResponse(ApiErrorResponse(400, 'Token is required'))
+  @ApiResponse(ApiErrorResponse(400, 'Invalid or expired verification token'))
+  async verifyEmail(
+    @Query('token') token: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (!token) {
+      throw new BadRequestException('Token is required');
+    }
+
+    const { redirectUrl } = await this.authService.verifyEmail(token);
+
+    if (redirectUrl) {
+      res.redirect(redirectUrl);
+    } else {
+      res.status(HttpStatus.OK).json({
+        success: true,
+        statusCode: 200,
+        data: { message: 'Email verified successfully' },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  @ApiTags('Auth - Local')
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend verification email' })
+  @ApiResponse({ status: 200, description: 'Verification email sent' })
+  async resendVerification(
+    @CurrentUser() user: ICurrentUser,
+  ): Promise<{ message: string }> {
+    const userDoc = await this.userService.findById(user.userId);
+
+    if (!userDoc) throw new NotFoundException('User not found');
+    if (userDoc.isEmailVerified) throw new BadRequestException('Email already verified');
+
+    await this.authService.sendVerificationEmail(userDoc);
+
+    return { message: 'Verification email sent' };
   }
 
   @Public()

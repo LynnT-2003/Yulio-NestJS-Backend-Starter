@@ -23,12 +23,14 @@ import { DiscordCallbackGuard } from './guards/discord/discord-callback.guard';
 import { MicrosoftStrategy } from './strategies/microsoft.strategy';
 import { MicrosoftGuard } from './guards/microsoft/microsoft.guard';
 import { MicrosoftCallbackGuard } from './guards/microsoft/microsoft-callback.guard';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     UserModule,       // gives AuthModule access to UserService
     PassportModule,
     JwtModule,        // intentionally no global config here — secrets passed per signAsync call
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [

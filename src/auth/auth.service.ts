@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -17,16 +18,22 @@ import {
   IJwtPayload,
 } from '../common/interfaces/auth.interface';
 import { StringValue } from 'ms';
+import * as crypto from 'crypto';
+import { MailService } from '../mail/mail.service';
+import { Logger } from '@nestjs/common';
 
 const SALT_ROUNDS = 10;
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
 @Injectable()
 export class AuthService implements IAuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) { }
 
   // ─── Register ────────────────────────────────────────────────────────────────
@@ -44,6 +51,10 @@ export class AuthService implements IAuthService {
       dto.email,
       hashedPassword,
       dto.displayName,
+    );
+
+    this.sendVerificationEmail(user).catch((err) =>
+      this.logger.error('Failed to send verification email', err),
     );
 
     const tokens = await this.generateTokens(user);
@@ -176,5 +187,45 @@ export class AuthService implements IAuthService {
     );
 
     return { accessToken, refreshToken };
+  }
+
+  // ─── Send Verification Email ──────────────────────────────────────────────────
+
+  async sendVerificationEmail(user: UserDocument): Promise<void> {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    await this.userService.saveEmailVerificationToken(
+      user._id,
+      hashedToken,
+      expiresAt,
+    );
+
+    await this.mailService.sendVerificationEmail(
+      user.email!,
+      user.displayName,
+      rawToken,
+    );
+  }
+
+  // ─── Verify Email ─────────────────────────────────────────────────────────────
+
+  async verifyEmail(rawToken: string): Promise<{ redirectUrl: string | null }> {
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    const user = await this.userService.findByVerificationToken(hashedToken);
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+
+    await this.userService.markEmailVerified(user._id);
+
+    const redirectUrl = this.configService.get<string>('VERIFY_REDIRECT_URL') ?? null;
+
+    return { redirectUrl };
   }
 }

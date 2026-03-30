@@ -54,4 +54,16 @@ export interface IAuthService {
      * Private to the service but declared here for transparency.
      */
     generateTokens(user: UserDocument): Promise<IAuthTokens>;
+
+    /**
+     * Send a verification email to the user.
+     * Generates a hashed token, saves it to the user, and sends the email.
+     */
+    sendVerificationEmail(user: UserDocument): Promise<void>;
+
+    /**
+     * Verify an email address via a token from an email link.
+     * Finds the user by the hashed token, marks them as verified, and returns the redirect URL.
+     */
+    verifyEmail(rawToken: string): Promise<{ redirectUrl: string | null }>;
 }

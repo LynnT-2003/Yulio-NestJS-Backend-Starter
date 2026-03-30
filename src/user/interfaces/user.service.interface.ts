@@ -79,4 +79,14 @@ export interface IUserService {
      * Used before any user object is sent in a response.
      */
     toPublic(user: UserDocument): IUserPublic;
+
+    saveEmailVerificationToken(
+        id: string | Types.ObjectId,
+        hashedToken: string,
+        expiresAt: Date,
+    ): Promise<void>;
+
+    findByVerificationToken(hashedToken: string): Promise<UserDocument | null>;
+
+    markEmailVerified(id: string | Types.ObjectId): Promise<void>;
 }
