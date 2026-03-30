@@ -89,4 +89,6 @@ export interface IUserService {
     findByVerificationToken(hashedToken: string): Promise<UserDocument | null>;
 
     markEmailVerified(id: string | Types.ObjectId): Promise<void>;
+
+    isUserHasAnySocialLoginProvider(id: string | Types.ObjectId): Promise<boolean>;
 }

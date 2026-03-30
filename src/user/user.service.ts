@@ -85,15 +85,22 @@ export class UserService implements IUserService {
           accessToken: dto.accessToken,
           connectedAt: new Date(),
         });
+
+
+        if (!byEmail.isEmailVerified && dto.provider !== OAuthProviderType.LOCAL) {
+          byEmail.isEmailVerified = true;
+        }
+
         return byEmail.save();
       }
     }
 
     // 3. Brand new user
-    return this.userRepo.create({
+    const user = await this.userRepo.create({
       email: dto.email ? dto.email.toLowerCase().trim() : null,
       displayName: dto.displayName,
       avatar: dto.avatar,
+      isEmailVerified: dto.provider === OAuthProviderType.LOCAL ? false : true,
       providers: [
         {
           provider: dto.provider,
@@ -103,6 +110,8 @@ export class UserService implements IUserService {
         },
       ],
     });
+
+    return user;
   }
 
   // ─── Update User ─────────────────────────────────────────────────────────────
@@ -198,12 +207,18 @@ export class UserService implements IUserService {
   ): Promise<void> {
     await this.userRepo.saveEmailVerificationToken(id, hashedToken, expiresAt);
   }
-  
+
   async findByVerificationToken(hashedToken: string): Promise<UserDocument | null> {
     return this.userRepo.findByVerificationToken(hashedToken);
   }
-  
+
   async markEmailVerified(id: string | Types.ObjectId): Promise<void> {
     await this.userRepo.markEmailVerified(id);
+  }
+
+  async isUserHasAnySocialLoginProvider(id: string | Types.ObjectId): Promise<boolean> {
+    const user = await this.userRepo.findById(id);
+    if (!user) return false;
+    return user.providers.some(p => p.provider !== OAuthProviderType.LOCAL);
   }
 }

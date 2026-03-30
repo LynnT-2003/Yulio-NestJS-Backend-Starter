@@ -192,6 +192,11 @@ export class AuthService implements IAuthService {
   // ─── Send Verification Email ──────────────────────────────────────────────────
 
   async sendVerificationEmail(user: UserDocument): Promise<void> {
+
+    if (user.isEmailVerified) {
+      throw new BadRequestException('Email already verified');
+    }
+
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 

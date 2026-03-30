@@ -2,10 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { buildAPIDocs } from './common/config/api-docs.config';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
+
+  // ─── Static Assets ────────────────────────────────────────────────────────────
+  app.useStaticAssets(join(__dirname, '..', 'assets'), { prefix: '/assets' });
 
   // ─── Global Prefix ───────────────────────────────────────────────────────────
   app.setGlobalPrefix('api');

@@ -17,6 +17,11 @@ These variables come from `.env.example` under **Mail Configuration (SMTP)**:
 
 Optional:
 
+- `COMPANY_NAME`
+  - Used for branding in email subjects and the base email wrapper (defaults to `AuthForge`).
+- `LOGO_URL`
+  - Used in the base email wrapper header. Recommended to point to a publicly reachable image URL.
+  - If you are hosting static assets from this API, you can use: `${BASE_URL}/assets/<your-image>`
 - `VERIFY_REDIRECT_URL`
   - If set, `GET /api/auth/verify-email?token=...` will redirect the browser to this URL after verification.
   - If not set, it returns the default JSON success response.
@@ -34,6 +39,26 @@ Optional:
 The relevant link base in code is:
 
 - `/api/auth/verify-email?token=${rawToken}`
+
+If the user is already verified, the API will not resend another verification email.
+
+---
+
+## MailService overview (templates + methods)
+
+Email HTML is built in two layers:
+
+- A **base wrapper** (`baseEmailTemplate`) that provides a consistent header/content/footer layout
+- A **content template** for each email type (verification, welcome, etc.)
+
+The mail service exposes:
+
+- `sendVerificationEmail(to, displayName, rawToken)`
+  - Builds `verifyUrl` using `BASE_URL` and wraps `verificationEmailContent(displayName, verifyUrl)` with the base wrapper.
+- `sendWelcomeEmail(to, displayName)`
+  - Wraps `welcomeEmailContent(displayName)` with the base wrapper.
+- `sendCustomEmail(to, subject, content)`
+  - Pass **raw HTML content** (it will still be wrapped by the base template automatically).
 
 ---
 
