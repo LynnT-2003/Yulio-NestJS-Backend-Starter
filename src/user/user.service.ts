@@ -14,12 +14,14 @@ import { IUserPublic } from '../common/interfaces/user.interface';
 import { OAuthProviderType } from '../common/enums/oauth-provider.enum';
 import { UserRepo } from './user.repo';
 import { ConfigService } from '@nestjs/config';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class UserService implements IUserService {
   constructor(
     private readonly userRepo: UserRepo,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) { }
 
   // ─── Find By Id ─────────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ export class UserService implements IUserService {
 
 
         if (!byEmail.isEmailVerified && dto.provider !== OAuthProviderType.LOCAL) {
+          this.mailService.sendCustomEmail(byEmail.email!, 'Account Verified', `Hello ${byEmail.displayName}, Your account has been verified successfully.`);
           byEmail.isEmailVerified = true;
         }
 

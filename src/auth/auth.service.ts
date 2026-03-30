@@ -229,6 +229,8 @@ export class AuthService implements IAuthService {
 
     await this.userService.markEmailVerified(user._id);
 
+    this.mailService.sendCustomEmail(user.email!, 'Account Verified', `Hello ${user.displayName}, Your account has been verified successfully.`);
+
     const redirectUrl = this.configService.get<string>('VERIFY_REDIRECT_URL') ?? null;
 
     return { redirectUrl };
