@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`JwtGuard`** now overrides `handleRequest` so JWT failures use deterministic **`message`** strings (still only the usual error envelope: `success`, `statusCode`, `message`, `path`, `timestamp`): **`jwt expired`** when `TokenExpiredError` is reported by passport-jwt (SPA refresh flow), **`invalid access token`** for other JWT verification failures; existing **`HttpException`** from `JwtStrategy.validate()` (e.g. user removed) is rethrown unchanged.
 - OAuth callback handlers in `AuthController` now use `@Res()` and a shared **`respondOAuthSuccess`** path: either redirect (when the env is set) or the same **JSON success envelope** as before (`success`, `statusCode`, `data`, `timestamp`) when integrating manually with `TransformInterceptor`-shaped responses for callbacks that bypass the interceptor on redirect only.
 
 ### Notes (template / demos)

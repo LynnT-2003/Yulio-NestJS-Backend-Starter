@@ -3,9 +3,18 @@ import {
   Catch,
   ExceptionFilter,
   HttpException,
-  HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+
+/** One string for clients: ValidationPipe sends `message: string[]`; we join. */
+function normalizeErrorMessage(raw: unknown, fallback: string): string {
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  if (Array.isArray(raw)) {
+    const parts = raw.map((x) => String(x)).filter(Boolean);
+    if (parts.length) return parts.join(', ');
+  }
+  return fallback;
+}
 
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -16,10 +25,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
 
-    const message =
+    const rawMessage =
       typeof exceptionResponse === 'string'
         ? exceptionResponse
-        : (exceptionResponse as any).message ?? 'An error occurred';
+        : (exceptionResponse as { message?: unknown }).message;
+
+    const message = normalizeErrorMessage(rawMessage, 'An error occurred');
 
     response.status(status).json({
       success: false,
