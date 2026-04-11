@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-11]
+
+### Added
+
+- Optional **`FRONTEND_OAUTH_CALLBACK_URL`** (`serverConfig.frontendOauthCallbackUrl`): when set, successful OAuth callbacks for **Google, LINE, GitHub, Discord, and Microsoft** respond with **302** to that URL and pass `accessToken`, `refreshToken`, and `userId` in the URL **fragment** (hash), for first-party SPAs without a BFF.
+- `src/auth/helpers/oauth-spa-redirect.helper.ts` to build the redirect target consistently.
+
+### Changed
+
+- OAuth callback handlers in `AuthController` now use `@Res()` and a shared **`respondOAuthSuccess`** path: either redirect (when the env is set) or the same **JSON success envelope** as before (`success`, `statusCode`, `data`, `timestamp`) when integrating manually with `TransformInterceptor`-shaped responses for callbacks that bypass the interceptor on redirect only.
+
+### Notes (template / demos)
+
+- **Default behavior is unchanged** for anyone who does **not** set `FRONTEND_OAUTH_CALLBACK_URL` (including empty `.env` / clone-and-run demos): callbacks still return **JSON on the API host**, which is ideal for Swagger, mobile, or “inspect the token payload” flows.
+- Setting the variable is **opt-in** for browser SPAs that need to land back on a frontend origin after OAuth.
+
+---
+
 ## [2026-03-30]
 
 ### Added

@@ -24,6 +24,7 @@ export function loadEnvConfigs(): EnvironmentConfigs {
         maxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 10,
       },
       baseUrl: process.env.BASE_URL || 'http://localhost:8080',
+      frontendOauthCallbackUrl: (process.env.FRONTEND_OAUTH_CALLBACK_URL || '').trim(),
     },
     databaseConfig: {
       username: process.env.MONGO_USERNAME ?? '',

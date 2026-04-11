@@ -18,6 +18,12 @@ export type ServerConfig = {
     maxRequests: number;
   };
   baseUrl: string;
+  /**
+   * When set (e.g. https://app.vercel.app/auth/callback), OAuth *success* callbacks
+   * redirect here with accessToken, refreshToken, userId in the URL **hash** instead
+   * of returning JSON on the API host.
+   */
+  frontendOauthCallbackUrl: string;
 };
 
 export type DatabaseConfig = {

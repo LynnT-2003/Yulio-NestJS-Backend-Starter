@@ -36,11 +36,34 @@ import { Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserService } from '../user/user.service';
+import { ConfigService } from '@nestjs/config';
+import { ServerConfig } from '../common/config/types/env';
+import { buildOAuthSpaRedirectUrl } from './helpers/oauth-spa-redirect.helper';
 
 @ApiExtraModels(AuthResponseDto, AuthTokensDto, EmailResponseDto, UserPublicDto)
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService, private readonly userService: UserService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+    private readonly configService: ConfigService,
+  ) { }
+
+  /** JSON envelope matches TransformInterceptor; redirect bypasses it intentionally. */
+  private respondOAuthSuccess(res: Response, auth: IAuthResponse): void {
+    const serverConfig = this.configService.get<ServerConfig>('serverConfig');
+    const spa = serverConfig?.frontendOauthCallbackUrl?.trim();
+    if (spa) {
+      res.redirect(HttpStatus.FOUND, buildOAuthSpaRedirectUrl(spa, auth));
+      return;
+    }
+    res.status(HttpStatus.OK).json({
+      success: true,
+      statusCode: HttpStatus.OK,
+      data: auth,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   @Public()
   @ApiTags('Auth - Local')
@@ -155,11 +178,19 @@ export class AuthController {
   @ApiTags('Auth - Google')
   @Get('google/callback')
   @UseGuards(GoogleCallbackGuard)
-  @ApiOperation({ summary: 'Google OAuth callback (handled by Passport)' })
+  @ApiOperation({
+    summary: 'Google OAuth callback (handled by Passport)',
+    description:
+      'JSON by default. Set FRONTEND_OAUTH_CALLBACK_URL to redirect (302) to your SPA with tokens in the URL hash.',
+  })
+  @ApiResponse({ status: 302, description: 'SPA redirect when FRONTEND_OAUTH_CALLBACK_URL is set' })
   @ApiResponse(ApiSuccessResponse(AuthResponseDto))
   @ApiResponse(ApiErrorResponse(401, 'OAuth error or invalid authorization code'))
-  googleCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
-    return req.user;
+  googleCallback(
+    @Req() req: { user: IAuthResponse },
+    @Res() res: Response,
+  ): void {
+    this.respondOAuthSuccess(res, req.user);
   }
 
   @Public()
@@ -178,15 +209,19 @@ export class AuthController {
   @ApiTags('Auth - Line')
   @Get('line/callback')
   @UseGuards(LineCallbackGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'LINE OAuth callback (Passport exchanges code, issues JWTs)' })
+  @ApiOperation({
+    summary: 'LINE OAuth callback (Passport exchanges code, issues JWTs)',
+    description:
+      'JSON by default. Set FRONTEND_OAUTH_CALLBACK_URL to redirect (302) to your SPA with tokens in the URL hash.',
+  })
+  @ApiResponse({ status: 302, description: 'SPA redirect when FRONTEND_OAUTH_CALLBACK_URL is set' })
   @ApiResponse(ApiSuccessResponse(AuthResponseDto))
   @ApiResponse(ApiErrorResponse(401, 'Invalid code, or email required but not available (strict mode)'))
-  lineCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
-    // LineCallbackGuard runs LineStrategy.validate()
-    // which calls findOrCreateOAuthUser + oauthLogin
-    // and attaches the full IAuthResponse to req.user
-    return req.user;
+  lineCallback(
+    @Req() req: { user: IAuthResponse },
+    @Res() res: Response,
+  ): void {
+    this.respondOAuthSuccess(res, req.user);
   }
 
   @Public()
@@ -202,12 +237,19 @@ export class AuthController {
   @ApiTags('Auth - Github')
   @Get('github/callback')
   @UseGuards(GithubCallbackGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'GitHub OAuth callback (Passport exchanges code, issues JWTs)' })
+  @ApiOperation({
+    summary: 'GitHub OAuth callback (Passport exchanges code, issues JWTs)',
+    description:
+      'JSON by default. Set FRONTEND_OAUTH_CALLBACK_URL to redirect (302) to your SPA with tokens in the URL hash.',
+  })
+  @ApiResponse({ status: 302, description: 'SPA redirect when FRONTEND_OAUTH_CALLBACK_URL is set' })
   @ApiResponse(ApiSuccessResponse(AuthResponseDto))
   @ApiResponse(ApiErrorResponse(401, 'OAuth error or invalid authorization code'))
-  githubCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
-    return req.user;
+  githubCallback(
+    @Req() req: { user: IAuthResponse },
+    @Res() res: Response,
+  ): void {
+    this.respondOAuthSuccess(res, req.user);
   }
 
   @Public()
@@ -223,12 +265,19 @@ export class AuthController {
   @ApiTags('Auth - Discord')
   @Get('discord/callback')
   @UseGuards(DiscordCallbackGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Discord OAuth callback (Passport exchanges code, issues JWTs)' })
+  @ApiOperation({
+    summary: 'Discord OAuth callback (Passport exchanges code, issues JWTs)',
+    description:
+      'JSON by default. Set FRONTEND_OAUTH_CALLBACK_URL to redirect (302) to your SPA with tokens in the URL hash.',
+  })
+  @ApiResponse({ status: 302, description: 'SPA redirect when FRONTEND_OAUTH_CALLBACK_URL is set' })
   @ApiResponse(ApiSuccessResponse(AuthResponseDto))
   @ApiResponse(ApiErrorResponse(401, 'OAuth error or invalid authorization code'))
-  discordCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
-    return req.user;
+  discordCallback(
+    @Req() req: { user: IAuthResponse },
+    @Res() res: Response,
+  ): void {
+    this.respondOAuthSuccess(res, req.user);
   }
 
   @Public()
@@ -244,11 +293,18 @@ export class AuthController {
   @ApiTags('Auth - Microsoft')
   @Get('microsoft/callback')
   @UseGuards(MicrosoftCallbackGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Microsoft OAuth callback (Passport exchanges code, issues JWTs)' })
+  @ApiOperation({
+    summary: 'Microsoft OAuth callback (Passport exchanges code, issues JWTs)',
+    description:
+      'JSON by default. Set FRONTEND_OAUTH_CALLBACK_URL to redirect (302) to your SPA with tokens in the URL hash.',
+  })
+  @ApiResponse({ status: 302, description: 'SPA redirect when FRONTEND_OAUTH_CALLBACK_URL is set' })
   @ApiResponse(ApiSuccessResponse(AuthResponseDto))
   @ApiResponse(ApiErrorResponse(401, 'OAuth error or invalid authorization code'))
-  microsoftCallback(@Req() req: { user: IAuthResponse }): IAuthResponse {
-    return req.user;
+  microsoftCallback(
+    @Req() req: { user: IAuthResponse },
+    @Res() res: Response,
+  ): void {
+    this.respondOAuthSuccess(res, req.user);
   }
 }
