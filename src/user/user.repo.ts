@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types, UpdateQuery } from 'mongoose';
+import { Model, QueryFilter, Types, UpdateQuery } from 'mongoose';
 import { User, UserDocument } from './entity/user.entity';
+import { UserRole } from 'src/common/enums/user-role.enum';
 
 @Injectable()
 export class UserRepo {
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
-  ) {}
+  ) { }
 
   // ─── Basic Finders ──────────────────────────────────────────────────────────
 
@@ -153,5 +154,46 @@ export class UserRepo {
         },
       },
     ).exec();
+  }
+
+  async updateUserRoleById(id: string | Types.ObjectId, role: UserRole): Promise<UserDocument | null> {
+    return this.userModel.findByIdAndUpdate(id, { $set: { role } }, { new: true }).exec();
+  }
+
+  async findManyForModeration(
+    filter: QueryFilter<UserDocument>,
+    skip: number,
+    limit: number,
+  ): Promise<UserDocument[]> {
+    return this.userModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+  }
+
+  async countForModeration(filter: QueryFilter<UserDocument>): Promise<number> {
+    return this.userModel.countDocuments(filter).exec();
+  }
+
+  async setSuspension(
+    id: string | Types.ObjectId,
+    suspended: boolean,
+    reason: string | null,
+  ): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            isSuspended: suspended,
+            suspensionReason: suspended ? reason : null,
+            suspendedAt: suspended ? new Date() : null,
+          },
+        },
+        { new: true },
+      )
+      .exec();
   }
 }

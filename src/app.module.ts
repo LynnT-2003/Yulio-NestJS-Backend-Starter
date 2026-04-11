@@ -4,6 +4,7 @@ import { MongooseModule, InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { JwtGuard } from './common/guards/jwt.guard';
@@ -33,6 +34,7 @@ import { buildMongoUri } from './common/config/mongo-uri-builder';
     // ─── Feature Modules ───────────────────────────────────────────────────────
     AuthModule,
     UserModule,
+    AdminModule,
   ],
   providers: [
     // ─── Global Guards ─────────────────────────────────────────────────────────

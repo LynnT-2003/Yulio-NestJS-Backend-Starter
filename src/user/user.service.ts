@@ -1,20 +1,35 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Types } from 'mongoose';
+import { isValidObjectId, QueryFilter, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 import { UserDocument } from './entity/user.entity';
 import { OAuthUserDto } from './dto/oauth-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { IUserService } from './interfaces/user.service.interface';
-import { IUserPublic } from '../common/interfaces/user.interface';
+import {
+  IUserAdminModerationView,
+  IUserPublic,
+} from '../common/interfaces/user.interface';
 import { OAuthProviderType } from '../common/enums/oauth-provider.enum';
 import { UserRepo } from './user.repo';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from '../mail/mail.service';
+import { UserRole } from '../common/enums/user-role.enum';
+
+const MODERATION_DEFAULT_LIMIT = 20;
+const MODERATION_MAX_LIMIT = 50;
+
+export type ModerationUserListResult = {
+  items: IUserAdminModerationView[];
+  total: number;
+  page: number;
+  limit: number;
+};
 
 @Injectable()
 export class UserService implements IUserService {
@@ -223,5 +238,116 @@ export class UserService implements IUserService {
     const user = await this.userRepo.findById(id);
     if (!user) return false;
     return user.providers.some(p => p.provider !== OAuthProviderType.LOCAL);
+  }
+
+  async updateUserRoleById(id: string | Types.ObjectId, role: UserRole): Promise<Partial<IUserPublic>> {
+    const user = await this.userRepo.updateUserRoleById(id, role);
+    if (!user) throw new NotFoundException('User not found');
+    return {
+      _id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+    };
+  }
+
+  // ─── Admin moderation ────────────────────────────────────────────────────────
+
+  toAdminModerationView(user: UserDocument): IUserAdminModerationView {
+    return {
+      ...this.toPublic(user),
+      isSuspended: !!user.isSuspended,
+      suspensionReason: user.suspensionReason ?? null,
+      suspendedAt: user.suspendedAt ?? null,
+    };
+  }
+
+  parseObjectIdParam(id: string): Types.ObjectId {
+    if (!isValidObjectId(id)) {
+      throw new BadRequestException('Invalid user id');
+    }
+    return new Types.ObjectId(id);
+  }
+
+  async listUsersForModeration(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    suspended?: boolean;
+  }): Promise<ModerationUserListResult> {
+    const page = Math.max(1, params.page);
+    const limit = Math.min(
+      MODERATION_MAX_LIMIT,
+      Math.max(1, params.limit || MODERATION_DEFAULT_LIMIT),
+    );
+    const filter: QueryFilter<UserDocument> = {};
+
+    const q = params.search?.trim();
+    if (q) {
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escaped, 'i');
+      filter.$or = [{ email: re }, { displayName: re }];
+    }
+
+    if (typeof params.suspended === 'boolean') {
+      filter.isSuspended = params.suspended;
+    }
+
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      this.userRepo.findManyForModeration(filter, skip, limit),
+      this.userRepo.countForModeration(filter),
+    ]);
+
+    return {
+      items: items.map((u) => this.toAdminModerationView(u)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getUserForModerationById(id: string): Promise<IUserAdminModerationView> {
+    const oid = this.parseObjectIdParam(id);
+    const user = await this.userRepo.findById(oid);
+    if (!user) throw new NotFoundException('User not found');
+    return this.toAdminModerationView(user);
+  }
+
+  async suspendUser(
+    actorUserId: string,
+    targetId: string,
+    reason?: string,
+  ): Promise<IUserAdminModerationView> {
+    const targetOid = this.parseObjectIdParam(targetId);
+    const actorOid = this.parseObjectIdParam(actorUserId);
+
+    if (targetOid.equals(actorOid)) {
+      throw new BadRequestException('Cannot suspend your own account');
+    }
+
+    const existing = await this.userRepo.findById(targetOid);
+    if (!existing) throw new NotFoundException('User not found');
+    if (existing.role === UserRole.ADMIN) {
+      throw new BadRequestException('Cannot suspend an administrator');
+    }
+
+    const trimmed = reason?.trim();
+    const user = await this.userRepo.setSuspension(
+      targetOid,
+      true,
+      trimmed && trimmed.length > 0 ? trimmed : null,
+    );
+    if (!user) throw new NotFoundException('User not found');
+
+    await this.removeAllRefreshTokens(targetOid);
+    return this.toAdminModerationView(user);
+  }
+
+  async unsuspendUser(targetId: string): Promise<IUserAdminModerationView> {
+    const targetOid = this.parseObjectIdParam(targetId);
+    const user = await this.userRepo.setSuspension(targetOid, false, null);
+    if (!user) throw new NotFoundException('User not found');
+    return this.toAdminModerationView(user);
   }
 }

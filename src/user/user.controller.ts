@@ -5,9 +5,11 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiSecurity } from '@nestjs/swagger';
 
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,6 +17,9 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ICurrentUser, IUserPublic } from '../common/interfaces/user.interface';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ApiKeyGuard } from '../common/guards/api-key.guard';
+import { Public } from '../common/decorators/public.decorator';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 const USER_EXAMPLE = {
   _id: '665a1b2c3d4e5f6a7b8c9d0e',
@@ -87,10 +92,40 @@ export class UserController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — admin role required' })
-  adminOnly(@CurrentUser() user: ICurrentUser): Promise<IUserPublic> {
+  async adminOnly(@CurrentUser() user: ICurrentUser): Promise<IUserPublic> {
     return this.userService.findById(user.userId).then((doc) => {
       if (!doc) throw new Error('User not found');
       return this.userService.toPublic(doc);
     });
+  }
+
+  @Patch('/role/:id')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update user role' })
+  @ApiBody({ type: UpdateRoleDto })
+  @ApiResponse({ status: 200, description: 'User role updated', schema: { example: { ...USER_EXAMPLE, role: 'admin' } } })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — admin role required' })
+  async updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto): Promise<Partial<IUserPublic>> {
+    return this.userService.updateUserRoleById(id, dto.role);
+  }
+}
+
+@Public()
+@ApiTags('Users - Internal Testing')
+@ApiSecurity('api-key')
+@UseGuards(ApiKeyGuard)
+@Controller('users/testing')
+export class UserTestingController {
+  constructor(private readonly userService: UserService) { }
+
+  @Patch('/role/:id')
+  @ApiOperation({ summary: 'FOR INTERNAL TESTING ONLY: Update user role via API key (refer to docs for more information)' })
+  @ApiBody({ type: UpdateRoleDto })
+  @ApiResponse({ status: 200, description: 'User role updated', schema: { example: { ...USER_EXAMPLE, role: 'admin' } } })
+  @ApiResponse({ status: 401, description: 'Unauthorized (API key required)' })
+  updateRoleTesting(@Param('id') id: string, @Body() dto: UpdateRoleDto): Promise<Partial<IUserPublic>> {
+    return this.userService.updateUserRoleById(id, dto.role);
   }
 }

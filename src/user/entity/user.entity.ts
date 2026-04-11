@@ -108,6 +108,15 @@ export class User {
     @Prop({ type: Date, default: null })
     emailVerificationExpiresAt: Date | null;
 
+    @Prop({ type: Boolean, default: false })
+    isSuspended: boolean;
+
+    @Prop({ type: String, default: null })
+    suspensionReason: string | null;
+
+    @Prop({ type: Date, default: null })
+    suspendedAt: Date | null;
+
     // Injected by timestamps: true
     createdAt: Date;
     updatedAt: Date;
@@ -126,3 +135,4 @@ export type UserDocument = User & Document;
 // Compound index: quickly find a user by a specific OAuth provider + providerId.
 // Used in findOrCreateOAuthUser() in user.service.ts.
 UserSchema.index({ 'providers.provider': 1, 'providers.providerId': 1 });
+UserSchema.index({ isSuspended: 1, createdAt: -1 });

@@ -31,6 +31,9 @@ export interface IUser {
     isEmailVerified: boolean;
     emailVerificationToken: string | null;
     emailVerificationExpiresAt: Date | null;
+    isSuspended: boolean;
+    suspensionReason: string | null;
+    suspendedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -48,6 +51,13 @@ export interface IUserPublic {
     providerDetails: Pick<IOAuthProvider, 'provider' | 'connectedAt'>[];
     createdAt: Date;
     updatedAt: Date;
+}
+
+/** Profile plus moderation fields — admin moderation APIs only. */
+export interface IUserAdminModerationView extends IUserPublic {
+    isSuspended: boolean;
+    suspensionReason: string | null;
+    suspendedAt: Date | null;
 }
 
 // ─── Current User (lives in JWT, injected by @CurrentUser()) ──────────────────

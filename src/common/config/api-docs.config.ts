@@ -31,6 +31,14 @@ export function buildAPIDocs(app: INestApplication): void {
       'Microsoft Entra ID OAuth: GET /auth/microsoft redirects; callback returns JWTs.',
     )
     .addTag('Users', 'Authenticated user profile and admin-only routes.')
+    .addTag(
+      'Admin - Moderation',
+      'Platform moderation: list users, view details, suspend and unsuspend accounts (admin JWT required).',
+    )
+    .addTag(
+      'Users - Internal Testing',
+      'Internal routes protected by the x-api-key header.',
+    )
     .addBearerAuth(
       {
         type: 'http',
@@ -41,6 +49,15 @@ export function buildAPIDocs(app: INestApplication): void {
         in: 'header',
       },
       'JWT-auth',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-api-key',
+        in: 'header',
+        description: 'Server API key (API_KEY env)',
+      },
+      'api-key',
     )
     .build();
 

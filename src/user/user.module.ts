@@ -6,12 +6,13 @@ import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { UserRepo } from './user.repo';
 import { MailService } from '../mail/mail.service';
+import { UserTestingController } from './user.controller';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
-  controllers: [UserController],
+  controllers: [UserController, UserTestingController],
   providers: [UserService, UserRepo, MailService],
   exports: [UserService, UserRepo],
 })
