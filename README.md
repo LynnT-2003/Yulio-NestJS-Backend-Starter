@@ -28,10 +28,9 @@ This is a production-ready boilerplate, following industry standards with:
 - JWT + refresh token rotation
 - Clean architecture (built to scale)
 - Swagger docs that never go out of sync
-- Based on real-world SaaS needs. 
+- Based on real-world SaaS needs.
 
 Built with one goal: **never re-write auth again**
-
 
 ## 🚀 Roadmap (Open-Source)
 
@@ -171,6 +170,66 @@ Two decorators. That's it.
 
 ---
 
+## Admin User Management & Account Suspension
+
+Accounts, **moderation**, and **suspension** are first-class. Suspension is modeled as **authorization**, not failed authentication: users can **sign in** and **refresh** while suspended; most JWT-protected routes return **`403 Forbidden`** with `message: "Account suspended"` unless explicitly allowlisted.
+
+### Persistence (`User`)
+
+| Field              | Purpose                                                                |
+| ------------------ | ---------------------------------------------------------------------- |
+| `role`             | `user` or `admin` — admins cannot be suspended via the moderation API. |
+| `isSuspended`      | Master switch (default `false`).                                       |
+| `suspensionReason` | Optional operator note (e.g. policy id), non-null while suspended.     |
+| `suspendedAt`      | Set when suspended; cleared on unsuspend.                              |
+
+Compound index `{ isSuspended: 1, createdAt: -1 }` supports moderation queries.
+
+### Authentication vs authorization
+
+- **`JwtStrategy`** loads the user and sets **`req.user`** (`ICurrentUser`) including **`isSuspended`**. It does **not** reject suspended users after a valid JWT.
+- **`SuspendedUserBlockGuard`** (global, registered after **`JwtGuard`**) throws **`ForbiddenException('Account suspended')`** when the user is suspended **unless** the handler is marked **`@AllowSuspendedUser()`**.
+
+### What suspended users may call (allowlist)
+
+**Default:** any other authenticated route → **403** + **`Account suspended`**.
+
+**In this template**, these handlers use **`@AllowSuspendedUser()`**:
+
+| Method | Path               | Purpose                                                            |
+| ------ | ------------------ | ------------------------------------------------------------------ |
+| `GET`  | `/api/users/me`    | Read profile (includes `suspensionReason`, `suspendedAt`).         |
+| `POST` | `/api/auth/logout` | Revoke the refresh token supplied in the body and end the session. |
+
+To let suspended users reach more endpoints (e.g. read-only billing), add **`@AllowSuspendedUser()`** only on those handlers. **`@Public()`** routes are unchanged (guard skips).
+
+Extended notes: [`documentation/SUSPENDED_AUTHORIZATION.md`](./documentation/SUSPENDED_AUTHORIZATION.md).
+
+### Public profile & login payloads
+
+**`IUserPublic`** / **`UserPublicDto`** / **`toPublic()`** always include **`isSuspended`**, **`suspensionReason`**, and **`suspendedAt`** so clients can show a banner immediately after login. **`IUserAdminModerationView`** is a type alias of **`IUserPublic`** (same JSON shape for moderation list/detail).
+
+### Admin moderation API
+
+All under **`/api/admin/moderation`**, **`@Roles(UserRole.ADMIN)`**. Suspended JWT users get **403** before role checks.
+
+| Method | Path                   | Description                                                                                                    |
+| ------ | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/users`               | Paginated list (`page`, `limit`, optional `search`, optional `suspended=true\|false`).                         |
+| `GET`  | `/users/:id`           | One user.                                                                                                      |
+| `POST` | `/users/:id/suspend`   | Optional body `{ "reason" }` (max 2000 chars); clears **all** refresh tokens; cannot target self or **admin**. |
+| `POST` | `/users/:id/unsuspend` | Clears suspension fields.                                                                                      |
+
+### Client contract
+
+Clients that key off suspension should match **`message`** (trimmed, case-insensitive) to **`account suspended`**; typical status for blocked routes is **403** (401 reserved for edge/legacy cases).
+
+### Reference SPA (Next.js)
+
+The matching frontend template documents banners, **`ApiError.isAccountSuspended`**, and admin UI rules under **Account management & suspended users** in its README (companion repo / monorepo folder `nextjs-vercel-template`).
+
+---
+
 ## Stack
 
 | Layer          | Technology                                                    |
@@ -188,6 +247,8 @@ Two decorators. That's it.
 
 ## Table of Contents
 
+- [Features](#features)
+- [Account management & suspension](#account-management--suspension)
 - [Quick Start](#quick-start)
 - [MongoDB Atlas Setup](#mongodb-atlas-setup)
 - [Google OAuth Setup](#google-oauth-setup)
