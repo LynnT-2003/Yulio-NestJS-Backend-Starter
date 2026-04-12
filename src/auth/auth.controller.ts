@@ -20,6 +20,7 @@ import { LocalGuard } from './guards/local/local.guard';
 import { GoogleGuard } from './guards/google/google.guard';
 import { GoogleCallbackGuard } from './guards/google/google-callback.guard';
 import { Public } from '../common/decorators/public.decorator';
+import { AllowSuspendedUser } from '../common/decorators/allow-suspended-user.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ICurrentUser } from '../common/interfaces/user.interface';
 import { IAuthResponse } from '../common/interfaces/auth.interface';
@@ -104,6 +105,7 @@ export class AuthController {
 
   @ApiTags('Auth - Local')
   @Post('logout')
+  @AllowSuspendedUser()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
   @ApiBody({ type: RefreshTokenDto })

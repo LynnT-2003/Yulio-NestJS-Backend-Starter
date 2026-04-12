@@ -80,8 +80,6 @@ export class AuthService implements IAuthService {
 
     if (!isMatch) return null;
 
-    if (user.isSuspended) return null;
-
     return user;
   }
 
@@ -89,10 +87,6 @@ export class AuthService implements IAuthService {
 
   // Called by auth.controller after LocalGuard attaches user to req.
   async login(user: UserDocument): Promise<IAuthResponse> {
-    if (user.isSuspended) {
-      throw new UnauthorizedException('Account suspended');
-    }
-
     const tokens = await this.generateTokens(user);
 
     return {
@@ -105,10 +99,6 @@ export class AuthService implements IAuthService {
 
   // Called by google.strategy after findOrCreateOAuthUser resolves.
   async oauthLogin(user: UserDocument): Promise<IAuthResponse> {
-    if (user.isSuspended) {
-      throw new UnauthorizedException('Account suspended');
-    }
-
     const tokens = await this.generateTokens(user);
 
     return {
@@ -130,10 +120,6 @@ export class AuthService implements IAuthService {
 
     if (!user) {
       throw new UnauthorizedException('Invalid or expired refresh token');
-    }
-
-    if (user.isSuspended) {
-      throw new UnauthorizedException('Account suspended');
     }
 
     // Rotate — remove old token, issue new pair

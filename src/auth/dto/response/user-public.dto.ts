@@ -66,6 +66,26 @@ export class UserPublicDto implements IUserPublic {
   providerDetails: Pick<IOAuthProvider, 'provider' | 'connectedAt'>[];
 
   @ApiProperty({
+    example: false,
+    description: 'When true, most authenticated routes return 403 until unsuspended',
+  })
+  isSuspended: boolean;
+
+  @ApiProperty({
+    example: null,
+    nullable: true,
+    description: 'Optional operator note (only when suspended)',
+  })
+  suspensionReason: string | null;
+
+  @ApiProperty({
+    example: null,
+    nullable: true,
+    description: 'When the account was suspended',
+  })
+  suspendedAt: Date | null;
+
+  @ApiProperty({
     example: '2026-03-22T00:00:00.000Z',
     description: 'Account creation timestamp',
   })

@@ -8,6 +8,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { JwtGuard } from './common/guards/jwt.guard';
+import { SuspendedUserBlockGuard } from './common/guards/suspended-user-block.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -42,6 +43,11 @@ import { buildMongoUri } from './common/config/mongo-uri-builder';
     {
       provide: APP_GUARD,
       useClass: JwtGuard,
+    },
+    // Suspended users get 403 unless the route is @AllowSuspendedUser()
+    {
+      provide: APP_GUARD,
+      useClass: SuspendedUserBlockGuard,
     },
     // RolesGuard runs after JwtGuard — req.user is already populated
     {

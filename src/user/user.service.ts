@@ -213,6 +213,9 @@ export class UserService implements IUserService {
         provider: p.provider,
         connectedAt: p.connectedAt,
       })),
+      isSuspended: !!user.isSuspended,
+      suspensionReason: user.suspensionReason ?? null,
+      suspendedAt: user.suspendedAt ?? null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -254,12 +257,7 @@ export class UserService implements IUserService {
   // ─── Admin moderation ────────────────────────────────────────────────────────
 
   toAdminModerationView(user: UserDocument): IUserAdminModerationView {
-    return {
-      ...this.toPublic(user),
-      isSuspended: !!user.isSuspended,
-      suspensionReason: user.suspensionReason ?? null,
-      suspendedAt: user.suspendedAt ?? null,
-    };
+    return this.toPublic(user);
   }
 
   parseObjectIdParam(id: string): Types.ObjectId {

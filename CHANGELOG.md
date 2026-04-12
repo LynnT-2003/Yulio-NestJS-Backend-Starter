@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-12]
+
+### Added
+
+- **`SuspendedUserBlockGuard`** (global, after **`JwtGuard`**): suspended users receive **`403 Forbidden`** with **`message: "Account suspended"`** on JWT-protected routes unless opted out.
+- **`@AllowSuspendedUser()`** decorator (`src/common/decorators/allow-suspended-user.decorator.ts`) to allow specific handlers for suspended accounts.
+- **`documentation/SUSPENDED_AUTHORIZATION.md`** — how to extend the allowlist.
+
+### Changed
+
+- **Suspension model**: **authentication** vs **authorization** — local login, OAuth, and refresh **no longer** reject suspended users; **`JwtStrategy`** attaches **`isSuspended`** on **`ICurrentUser`** instead of throwing **`401 Account suspended`**.
+- **`IUserPublic`** / **`UserPublicDto`** / **`toPublic()`** include **`isSuspended`**, **`suspensionReason`**, **`suspendedAt`** for all consumers of public user JSON.
+- **`IUserAdminModerationView`** is now a **type alias** of **`IUserPublic`** (same fields).
+- **`GET /api/users/me`** and **`POST /api/auth/logout`** use **`@AllowSuspendedUser()`** so suspended users can read profile and sign out.
+
+### Security
+
+- Suspended users are blocked from **most Bearer-authenticated routes** (**403**) by default; expand allowed behavior only with **`@AllowSuspendedUser()`**. Suspending a user still clears **all refresh tokens**.
+
 ## [2026-04-11]
 
 ### Added
@@ -27,12 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`JwtGuard`** now overrides `handleRequest` so JWT failures use deterministic **`message`** strings (still only the usual error envelope: `success`, `statusCode`, `message`, `path`, `timestamp`): **`jwt expired`** when `TokenExpiredError` is reported by passport-jwt (SPA refresh flow), **`invalid access token`** for other JWT verification failures; existing **`HttpException`** from `JwtStrategy.validate()` (e.g. user removed) is rethrown unchanged.
 - OAuth callback handlers in `AuthController` now use `@Res()` and a shared **`respondOAuthSuccess`** path: either redirect (when the env is set) or the same **JSON success envelope** as before (`success`, `statusCode`, `data`, `timestamp`) when integrating manually with `TransformInterceptor`-shaped responses for callbacks that bypass the interceptor on redirect only.
 - **`src/common/strategies/jwt.strategy.ts`**: **`JwtStrategy.validate()`** now returns **`role: user.role`** instead of **`role: payload.role`**, and uses the loaded document for **`userId`** and **`email`** as well, so **`req.user`** matches MongoDB after **`findById`** rather than stale JWT claims (role changes apply on the next authenticated request).
-- **`AuthService`**: **`validateLocalUser`** returns no user when **`isSuspended`**; **`login`**, **`oauthLogin`**, and **`refreshTokens`** throw **`UnauthorizedException('Account suspended')`** for suspended accounts.
+- **`AuthService`**: _(Superseded **[2026-04-12]** — suspended users may authenticate; use **`SuspendedUserBlockGuard`**.)_ Previously **`validateLocalUser`** returned no user when **`isSuspended`**; **`login`**, **`oauthLogin`**, and **`refreshTokens`** threw **`UnauthorizedException('Account suspended')`**.
 - **`UserModule`** registers **`UserTestingController`** alongside **`UserController`**; **`AppModule`** imports **`AdminModule`**.
 
 ### Security
 
-- Suspended users are blocked from **Bearer access** (`JwtStrategy`), **local login**, **OAuth token issuance**, and **refresh**; suspending a user clears **all refresh tokens**.
+- _(Behavior updated **[2026-04-12]**.)_ At this release, suspended users were blocked at JWT validation and login/refresh; suspending still cleared refresh tokens.
 - Treat **`API_KEY`** and the **`/api/users/testing/*`** routes as **privileged**: use a strong key in production, restrict exposure (network / feature flags), or remove the testing controller if you do not need bootstrap-by-key.
 
 ### Notes (template / demos)

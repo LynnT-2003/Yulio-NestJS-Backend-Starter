@@ -19,16 +19,20 @@ import { ICurrentUser, IUserPublic } from '../common/interfaces/user.interface';
 import { UserRole } from '../common/enums/user-role.enum';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
 import { Public } from '../common/decorators/public.decorator';
+import { AllowSuspendedUser } from '../common/decorators/allow-suspended-user.decorator';
 import { UpdateRoleDto } from './dto/update-role.dto';
 
 const USER_EXAMPLE = {
-  _id: '665a1b2c3d4e5f6a7b8c9d0e',
+  _id: '665a1b2c3d4e5f6a7b8c9d0e1',
   email: 'john@example.com',
   displayName: 'John Doe',
   avatar: null,
   role: 'user',
   isEmailVerified: false,
   providers: [],
+  isSuspended: false,
+  suspensionReason: null,
+  suspendedAt: null,
   createdAt: '2026-03-22T00:00:00.000Z',
   updatedAt: '2026-03-22T00:00:00.000Z',
 };
@@ -40,6 +44,7 @@ export class UserController {
   constructor(private readonly userService: UserService) { }
 
   @Get('me')
+  @AllowSuspendedUser()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile', schema: { example: USER_EXAMPLE } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

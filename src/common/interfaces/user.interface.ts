@@ -49,21 +49,23 @@ export interface IUserPublic {
     isEmailVerified: boolean;
     providers: OAuthProviderType[];
     providerDetails: Pick<IOAuthProvider, 'provider' | 'connectedAt'>[];
+    /** Suspension is an authorization state; clients use this for banners and UX. */
+    isSuspended: boolean;
+    suspensionReason: string | null;
+    suspendedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
 
-/** Profile plus moderation fields — admin moderation APIs only. */
-export interface IUserAdminModerationView extends IUserPublic {
-    isSuspended: boolean;
-    suspensionReason: string | null;
-    suspendedAt: Date | null;
-}
+/** Same shape as {@link IUserPublic} — kept for admin moderation API naming. */
+export type IUserAdminModerationView = IUserPublic;
 
-// ─── Current User (lives in JWT, injected by @CurrentUser()) ──────────────────
+// ─── Current User (lives on req.user after JwtStrategy.validate()) ─────────────
 
 export interface ICurrentUser {
     userId: string; // stringified ObjectId from JWT sub
     email: string | null;
     role: UserRole;
+    /** Loaded from DB on each request — not embedded in the JWT payload. */
+    isSuspended: boolean;
 }
