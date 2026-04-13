@@ -14,6 +14,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { loadEnvConfigs } from './common/config/env.config';
 import { buildMongoUri } from './common/config/mongo-uri-builder';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { buildMongoUri } from './common/config/mongo-uri-builder';
     AuthModule,
     UserModule,
     AdminModule,
+    UploadModule,
   ],
   providers: [
     // ─── Global Guards ─────────────────────────────────────────────────────────

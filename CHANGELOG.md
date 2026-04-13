@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-04-14]
+
+### Added
+
+- **`UploadModule`** (`src/upload/`): image upload to **Cloudflare R2** using the **S3-compatible API** via **`@aws-sdk/client-s3`** (`S3Client` with endpoint `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, region `auto`).
+- **`POST /api/upload`** (JWT): **`multipart/form-data`** field **`file`**; **5 MB** max; allowed types **`image/jpeg`**, **`image/png`**, **`image/apng`**, **`image/gif`**, **`image/webp`**. Objects are stored under **`images/{uuid}{ext}`** with long-lived **`Cache-Control`**. Response body includes public **`url`** and object **`key`**.
+- **`DELETE /api/upload`** (JWT): JSON body **`{ "url": "<public URL>" }`** deletes the object when the URL matches this deployment’s **`R2_PUBLIC_BASE_URL`** and the **`images/`** prefix; **`400`** if the URL is not a managed object for this server.
+- **Configuration** (see **`.env.example`**): **`R2_ACCOUNT_ID`**, **`R2_ACCESS_KEY_ID`**, **`R2_SECRET_ACCESS_KEY`**, **`R2_BUCKET_NAME`**, **`R2_PUBLIC_BASE_URL`** (public origin for the bucket, trailing slashes normalized). If any are missing, upload/delete endpoints respond with **`503`** (“File uploads are not configured…”).
+- **`UploadService`** helpers for other features: **`parseManagedImageKey`**, **`tryDeleteManagedImage`** (best-effort delete by URL when the key is under **`images/`**).
+
+### Notes
+
+- **`ParseFilePipe`** uses **`FileTypeValidator`** with **`skipMagicNumbersValidation: true`** so validation relies on the multipart **Content-Type** (avoids **file-type** / ESM issues on **Vercel** serverless in a CJS Nest build).
+
 ## [2026-04-12]
 
 ### Added
