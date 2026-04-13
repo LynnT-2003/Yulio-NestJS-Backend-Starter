@@ -104,6 +104,7 @@ This opens the `.env` file in TextEdit. Fill in the values — see **README.md**
 | `MONGO_DB_NAME` | Pick any name, e.g. `myapp-dev` |
 | `JWT_ACCESS_SECRET` | Any random string, at least 32 characters |
 | `JWT_REFRESH_SECRET` | Any random string, at least 32 characters (different from above) |
+| `R2_*` (optional) | Only if you use image upload — see README.md → Cloudflare R2 Setup or **`documentation/R2.md`** |
 
 Save (`Command + S`) and close.
 
@@ -156,6 +157,10 @@ This is where you test every API endpoint.
 ### Test your profile
 
 Click **GET /api/users/me** → **Try it out** → **Execute**. You should see your user profile in the response.
+
+### Optional: test image upload (Cloudflare R2)
+
+If you configured all **`R2_*`** variables in `.env`, open the **Upload** section in Swagger → **POST /api/upload** → **Try it out** → choose an image file under **`file`** → **Execute**. You should get a **`url`** and **`key`** in the response. If R2 is not configured, the API returns **503** — that is expected until you follow **`documentation/R2.md`**.
 
 ---
 
@@ -234,3 +239,6 @@ Open Claude Code and say: `"Revert the last changes you made"`.
 
 **Google login not working**
 See README.md → Google OAuth Setup. LINE, GitHub, Discord, Microsoft setup guides: `documentation/{PROVIDER}.md`.
+
+**Upload returns 503 “File uploads are not configured”**
+Add all five **`R2_*`** variables to `.env` (or Vercel) using **`documentation/R2.md`**.

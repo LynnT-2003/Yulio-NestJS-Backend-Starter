@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`DELETE /api/upload`** (JWT): JSON body **`{ "url": "<public URL>" }`** deletes the object when the URL matches this deployment’s **`R2_PUBLIC_BASE_URL`** and the **`images/`** prefix; **`400`** if the URL is not a managed object for this server.
 - **Configuration** (see **`.env.example`**): **`R2_ACCOUNT_ID`**, **`R2_ACCESS_KEY_ID`**, **`R2_SECRET_ACCESS_KEY`**, **`R2_BUCKET_NAME`**, **`R2_PUBLIC_BASE_URL`** (public origin for the bucket, trailing slashes normalized). If any are missing, upload/delete endpoints respond with **`503`** (“File uploads are not configured…”).
 - **`UploadService`** helpers for other features: **`parseManagedImageKey`**, **`tryDeleteManagedImage`** (best-effort delete by URL when the key is under **`images/`**).
+- **Docs:** **`documentation/R2.md`**; **README.md**, **`documentation/SETUP.md`**, and **`documentation/CLAUDE.md`** updated for Cloudflare R2 and **`/api/upload`**.
 
 ### Notes
 

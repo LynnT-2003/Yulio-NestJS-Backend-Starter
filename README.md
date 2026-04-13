@@ -67,6 +67,7 @@ Built specifically for Vercel from day one. Not an afterthought. Not a wrapper.
 - Stateless OAuth flows — no session storage needed
 - Exported handler — Vercel picks it up automatically
 - Push to main → live in 30 seconds
+- Optional **image uploads** to **Cloudflare R2** (S3-compatible, JWT-protected) — see [Cloudflare R2 Setup](#cloudflare-r2-setup)
 
 ```
 git clone → fill .env → vercel --prod → shipped
@@ -251,6 +252,7 @@ The matching frontend template documents banners, **`ApiError.isAccountSuspended
 - [Account management & suspension](#account-management--suspension)
 - [Quick Start](#quick-start)
 - [MongoDB Atlas Setup](#mongodb-atlas-setup)
+- [Cloudflare R2 Setup](#cloudflare-r2-setup)
 - [Google OAuth Setup](#google-oauth-setup)
 - [LINE Login Setup](#line-login-setup)
 - [GitHub, Discord, and Microsoft OAuth](#github-discord-and-microsoft-oauth)
@@ -276,7 +278,7 @@ npm install
 # 2. Copy environment file
 cp .env.example .env
 
-# 3. Fill in .env (see sections below for MongoDB and OAuth providers)
+# 3. Fill in .env (see sections below for MongoDB, OAuth, and optional Cloudflare R2)
 
 # 4. Run
 npm run start:dev
@@ -470,6 +472,28 @@ Register each app’s **redirect URI** to match the corresponding `*_CALLBACK_UR
 
 ---
 
+## Cloudflare R2 Setup
+
+This template can store user-uploaded images in **Cloudflare R2** using the **S3-compatible API** (`UploadModule`, `@aws-sdk/client-s3`). Uploads are **optional**: without the R2 variables, **`POST /api/upload`** and **`DELETE /api/upload`** return **503** with a clear message.
+
+**What you configure**
+
+1. Create an **R2 bucket** in the Cloudflare dashboard.
+2. Create **R2 API credentials** (Access Key ID + Secret Access Key) with object read/write on that bucket.
+3. Expose objects with a **public URL** — either the bucket’s **R2.dev** subdomain or a **custom domain** — and set that origin as **`R2_PUBLIC_BASE_URL`** (no trailing slash).
+4. Copy **Account ID** from Cloudflare into **`R2_ACCOUNT_ID`**.
+
+**Endpoints** (JWT, documented under Swagger tag **Upload**)
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `POST` | `/api/upload` | `multipart/form-data`, field **`file`** — max 5 MB, JPEG/PNG/APNG/GIF/WebP |
+| `DELETE` | `/api/upload` | JSON `{ "url": "<public URL>" }` — only URLs under your **`R2_PUBLIC_BASE_URL`** with path prefix **`images/`** |
+
+**Full walkthrough** (dashboard steps, env vars, CORS notes, troubleshooting): [`documentation/R2.md`](./documentation/R2.md).
+
+---
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` and fill in the values.
@@ -524,6 +548,13 @@ DISCORD_CALLBACK_URL=http://localhost:8080/api/auth/discord/callback
 MICROSOFT_CLIENT_ID=
 MICROSOFT_CLIENT_SECRET=
 MICROSOFT_CALLBACK_URL=http://localhost:8080/api/auth/microsoft/callback
+
+# Cloudflare R2 — optional until you use POST /api/upload (see "Cloudflare R2 Setup" and documentation/R2.md)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_BASE_URL=https://pub-xxxxx.r2.dev
 ```
 
 `ConfigModule` exposes `process.env` to Nest (e.g. `ConfigService` in strategies). Shared app config is assembled in `loadEnvConfigs()` in `src/configs/env.config.ts`; OAuth secrets for these providers are read directly from the environment where needed (see `src/auth/strategies/*.strategy.ts`).
@@ -546,6 +577,7 @@ In your Vercel project → **Settings** → **Environment Variables**, add every
 | `GITHUB_CALLBACK_URL`    | `https://your-app.vercel.app/api/auth/github/callback`    |
 | `DISCORD_CALLBACK_URL`   | `https://your-app.vercel.app/api/auth/discord/callback`   |
 | `MICROSOFT_CALLBACK_URL` | `https://your-app.vercel.app/api/auth/microsoft/callback` |
+| `R2_*` (five variables) | Same values as local/prod R2 bucket — omit or leave empty if you do not use uploads |
 
 ### 2. Push and deploy
 
@@ -594,6 +626,10 @@ The repo includes `vercel.json` — push to your connected branch and Vercel dep
 │  │  DiscordStrategy   │                  │                      │
 │  │  MicrosoftStrategy │                  │                      │
 │  │  JwtStrategy       │                  │                      │
+│  └────────────────────┘                  │                      │
+│  ┌────────────────────┐                  │                      │
+│  │  UploadModule      │ ── optional R2   │                      │
+│  │  (S3 → R2)         │                  │                      │
 │  └────────────────────┘                  │                      │
 │                                          ▼                      │
 │                           ┌──────────────────────────┐          │
@@ -960,6 +996,15 @@ All responses are wrapped by `TransformInterceptor`:
 | DELETE | `/api/users/me`    | JwtGuard                   | —               | Delete account   |
 | GET    | `/api/users/admin` | JwtGuard + `@Roles(ADMIN)` | —               | Admin-only route |
 
+### Upload (Cloudflare R2)
+
+Requires all **`R2_*`** env vars; otherwise **503**. See [Cloudflare R2 Setup](#cloudflare-r2-setup).
+
+| Method | Path            | Guard    | Body / input                    | Description                          |
+| ------ | --------------- | -------- | ------------------------------- | ------------------------------------ |
+| POST   | `/api/upload`   | JwtGuard | `multipart/form-data` → **`file`** | Upload image; returns `url` and `key` |
+| DELETE | `/api/upload`   | JwtGuard | `{ "url" }`                     | Delete object by public URL          |
+
 ---
 
 ## Security Model
@@ -1129,6 +1174,13 @@ src/
 │   ├── auth.service.ts
 │   ├── auth.controller.ts
 │   └── auth.module.ts
+│
+├── upload/
+│   ├── dto/
+│   │   └── upload.dto.ts                Request/response DTOs for upload & delete
+│   ├── upload.service.ts                R2 / S3 client, images/ key prefix
+│   ├── upload.controller.ts             POST & DELETE /api/upload
+│   └── upload.module.ts
 │
 └── user/
     ├── interfaces/
