@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { OAuthProviderType } from '../../common/enums/oauth-provider.enum';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { PaymentPlanId } from '../../common/enums/payment-plan.enum';
 
 // ─── Subdocument: OAuthProvider ───────────────────────────────────────────────
 
@@ -120,6 +121,15 @@ export class User {
     // Injected by timestamps: true
     createdAt: Date;
     updatedAt: Date;
+
+    @Prop({ type: String, default: null })
+    stripeCustomerId: string | null;
+
+    @Prop({ type: String, enum: PaymentPlanId, default: PaymentPlanId.FREE })
+    plan: PaymentPlanId;
+
+    @Prop({ type: Date, default: null })
+    planExpiresAt: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

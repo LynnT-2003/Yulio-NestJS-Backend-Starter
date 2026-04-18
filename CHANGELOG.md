@@ -2,6 +2,56 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-04-18]
+
+### Added
+
+- **`PaymentModule`** (`src/payment/`): end-to-end Stripe integration for SaaS monetization — checkout sessions, billing portal, webhooks, and plan enforcement.
+- **`PaymentService`** (`src/payment/payment.service.ts`): implements `IPaymentService` with four methods:
+  - `createCheckoutSession` — creates a Stripe Checkout session (subscription or one-time payment), lazily creating a Stripe customer on first purchase.
+  - `createBillingPortalSession` — opens the Stripe billing portal for plan management and cancellations.
+  - `getUserPlan` — returns current `plan`, `planExpiresAt`, and `stripeCustomerId`.
+  - `handleWebhook` — verifies Stripe signature, enforces idempotency via `stripeEventId`, and routes three events: `checkout.session.completed`, `invoice.paid`, `customer.subscription.deleted`.
+- **`TransactionService`** (`src/payment/transaction.service.ts`): `create`, `findByUser`, `existsByStripeEventId`.
+- **`Transaction` entity** (`src/payment/entity/transaction.entity.ts`): stores `userId` (string, indexed), `stripeEventId` (unique — DB-level idempotency guard), `stripeCustomerId`, `type`, `plan`, `amount` (cents), `currency`, `status`.
+- **`PaymentController`** (`src/payment/payment.controller.ts`): four endpoints (see API Reference below).
+- **`PlanGuard`** (`src/common/guards/plan.guard.ts`): global guard that enforces `@RequiresPlan(PaymentPlanId.PRO)` / `@RequiresPlan(PaymentPlanId.LIFETIME)` on any route. Checks plan rank and subscription expiry. Lifetime users are never downgraded.
+- **`@RequiresPlan()`** decorator (`src/common/decorators/plan.decorator.ts`): sets required plan metadata consumed by `PlanGuard`.
+- **`PaymentPlanId` enum** (`src/common/enums/payment-plan.enum.ts`): `FREE`, `PRO`, `LIFETIME`.
+- **User schema fields**: `stripeCustomerId`, `plan` (default `FREE`), `planExpiresAt`.
+- **`documentation/STRIPE.md`**: step-by-step Stripe setup guide (dashboard, price IDs, webhook CLI, env vars, production checklist).
+- **`.env.example`** updated with correct Stripe keys: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PRO`, `STRIPE_PRICE_ID_LIFETIME`.
+- **`main.ts`**: `rawBody: true` added to `NestFactory.create` so `req.rawBody` is available as a `Buffer` for Stripe webhook signature verification.
+
+### Payment API Endpoints
+
+| Method | Path | Guard | Description |
+|--------|------|-------|-------------|
+| `POST` | `/api/payment/checkout` | JWT | Create Stripe checkout session; returns `{ url, sessionId }` |
+| `POST` | `/api/payment/billing-portal` | JWT | Open billing portal; returns `{ url }` |
+| `GET` | `/api/payment/plan` | JWT | Get current plan status |
+| `POST` | `/api/payment/webhook` | Public | Stripe webhook — raw body, signature verified |
+
+### Webhook Events Handled
+
+| Event | Action |
+|-------|--------|
+| `checkout.session.completed` | Saves `stripeCustomerId`; upgrades plan for one-time purchases |
+| `invoice.paid` | Upgrades plan and sets `planExpiresAt` for subscriptions |
+| `customer.subscription.deleted` | Downgrades to FREE; lifetime users are never downgraded |
+
+### Security / Reliability
+
+- Webhook signature verified via `stripe.webhooks.constructEvent` before any processing.
+- Idempotency enforced at two layers: `stripeEventId` unique DB index + service-level check before handler runs.
+- Transaction written before `user.save()` — if the user update fails, Stripe can retry and the event won't be double-processed.
+- `PlanGuard` null-checks `req.user` to prevent crashes on misconfigured `@Public()` + `@RequiresPlan()` routes.
+- Lifetime plan is never downgraded by subscription cancellation events.
+
+---
+
+All notable changes to this project will be documented in this file.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

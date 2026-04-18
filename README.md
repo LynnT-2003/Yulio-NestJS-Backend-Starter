@@ -38,7 +38,7 @@ Actively Maintained. Built in public. Production-first.
 
 1. Admin-User Multi-Provider Authentication
 2. Email Automation with Nodemailer and Brevo
-3. Payment Gateway (Stripe and Omise for Domestic)
+3. ~~Payment Gateway (Stripe)~~ ✅ Shipped
 
 **Frontend Boilerplate**
 
@@ -252,6 +252,7 @@ The matching frontend template documents banners, **`ApiError.isAccountSuspended
 - [Account management & suspension](#account-management--suspension)
 - [Quick Start](#quick-start)
 - [MongoDB Atlas Setup](#mongodb-atlas-setup)
+- [Stripe Payments Setup](#stripe-payments-setup)
 - [Cloudflare R2 Setup](#cloudflare-r2-setup)
 - [Google OAuth Setup](#google-oauth-setup)
 - [LINE Login Setup](#line-login-setup)
@@ -472,6 +473,41 @@ Register each app’s **redirect URI** to match the corresponding `*_CALLBACK_UR
 
 ---
 
+## Stripe Payments Setup
+
+This template includes a production-ready Stripe integration: checkout sessions, billing portal, webhook handling, idempotent transaction recording, and plan-based route enforcement.
+
+Full walkthrough: [`documentation/STRIPE.md`](./documentation/STRIPE.md)
+
+**What's included**
+
+- `POST /api/payment/checkout` — create a checkout session (subscription or one-time)
+- `POST /api/payment/billing-portal` — open the Stripe billing portal
+- `GET /api/payment/plan` — read the user's current plan
+- `POST /api/payment/webhook` — Stripe webhook with signature verification and idempotency
+
+**Plan enforcement on any route**
+
+```typescript
+@RequiresPlan(PaymentPlanId.PRO)
+@Get('pro-feature')
+getProFeature(@CurrentUser() user: ICurrentUser) {}
+```
+
+`PlanGuard` is global — one decorator locks any route to a minimum plan tier. Lifetime users are never affected by subscription cancellations.
+
+**User model fields added**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `stripeCustomerId` | `string \| null` | Created on first checkout |
+| `plan` | `PaymentPlanId` | `free` \| `pro` \| `lifetime`, default `free` |
+| `planExpiresAt` | `Date \| null` | Set by subscription renewals; null for lifetime |
+
+See [`documentation/STRIPE.md`](./documentation/STRIPE.md) for the complete setup guide.
+
+---
+
 ## Cloudflare R2 Setup
 
 This template can store user-uploaded images in **Cloudflare R2** using the **S3-compatible API** (`UploadModule`, `@aws-sdk/client-s3`). Uploads are **optional**: without the R2 variables, **`POST /api/upload`** and **`DELETE /api/upload`** return **503** with a clear message.
@@ -555,6 +591,12 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET_NAME=
 R2_PUBLIC_BASE_URL=https://pub-xxxxx.r2.dev
+
+# Stripe (see documentation/STRIPE.md)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_PRO=price_...
+STRIPE_PRICE_ID_LIFETIME=price_...
 ```
 
 `ConfigModule` exposes `process.env` to Nest (e.g. `ConfigService` in strategies). Shared app config is assembled in `loadEnvConfigs()` in `src/configs/env.config.ts`; OAuth secrets for these providers are read directly from the environment where needed (see `src/auth/strategies/*.strategy.ts`).
@@ -996,6 +1038,17 @@ All responses are wrapped by `TransformInterceptor`:
 | DELETE | `/api/users/me`    | JwtGuard                   | —               | Delete account   |
 | GET    | `/api/users/admin` | JwtGuard + `@Roles(ADMIN)` | —               | Admin-only route |
 
+### Payment Endpoints
+
+Requires `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PRO`, `STRIPE_PRICE_ID_LIFETIME`. See [Stripe Payments Setup](#stripe-payments-setup).
+
+| Method | Path | Guard | Body / input | Description |
+|--------|------|-------|-------------|-------------|
+| POST | `/api/payment/checkout` | JwtGuard | `{ priceId, successUrl, cancelUrl }` | Create checkout session; returns `{ url, sessionId }` |
+| POST | `/api/payment/billing-portal` | JwtGuard | `{ returnUrl }` | Open billing portal; returns `{ url }` |
+| GET | `/api/payment/plan` | JwtGuard | — | Current plan: `{ plan, planExpiresAt, stripeCustomerId }` |
+| POST | `/api/payment/webhook` | Public | Raw body | Stripe webhook — signature verified, idempotent |
+
 ### Upload (Cloudflare R2)
 
 Requires all **`R2_*`** env vars; otherwise **503**. See [Cloudflare R2 Setup](#cloudflare-r2-setup).
@@ -1016,7 +1069,7 @@ Requires all **`R2_*`** env vars; otherwise **503**. See [Cloudflare R2 Setup](#
 | Authentication   | JWT access token — 15 min expiry, signed with `JWT_ACCESS_SECRET`                                                                                 |
 | Refresh tokens   | 30 day expiry, stored as bcrypt hash in MongoDB, rotated on every use                                                                             |
 | Passwords        | bcrypt (10 salt rounds), `select: false` on schema                                                                                                |
-| Authorization    | Role-based via `@Roles()` + `RolesGuard`, checked after JWT validation                                                                            |
+| Authorization    | Role-based via `@Roles()` + `RolesGuard`; plan-based via `@RequiresPlan()` + `PlanGuard`                                                                            |
 | Data exposure    | `password` and `refreshTokens` excluded from queries via `select: false`; `IUserPublic` strips sensitive fields; OAuth providers expose name only |
 
 ---
@@ -1181,6 +1234,20 @@ src/
 │   ├── upload.service.ts                R2 / S3 client, images/ key prefix
 │   ├── upload.controller.ts             POST & DELETE /api/upload
 │   └── upload.module.ts
+│
+├── payment/
+│   ├── interfaces/
+│   │   ├── payment.service.interface.ts  IPaymentService contract
+│   │   └── transaction.service.interface.ts
+│   ├── entity/
+│   │   └── transaction.entity.ts        Mongoose schema (stripeEventId unique index)
+│   ├── dto/
+│   │   ├── create-checkout-session.dto.ts
+│   │   └── create-billing-portal-session.dto.ts
+│   ├── payment.service.ts               Stripe client, checkout, webhook, plan sync
+│   ├── transaction.service.ts           create, findByUser, existsByStripeEventId
+│   ├── payment.controller.ts            POST checkout, billing-portal, webhook; GET plan
+│   └── payment.module.ts
 │
 └── user/
     ├── interfaces/

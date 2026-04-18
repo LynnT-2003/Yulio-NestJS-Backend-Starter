@@ -4,6 +4,8 @@ import { MongooseModule, InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
+import { User, UserSchema } from './user/entity/user.entity';
+import { PlanGuard } from './common/guards/plan.guard';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
@@ -15,6 +17,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { loadEnvConfigs } from './common/config/env.config';
 import { buildMongoUri } from './common/config/mongo-uri-builder';
 import { UploadModule } from './upload/upload.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -33,11 +36,15 @@ import { UploadModule } from './upload/upload.module';
       }),
     }),
 
+    // User model Dependency injection - PlanGuard needs User model to check plan
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+
     // ─── Feature Modules ───────────────────────────────────────────────────────
     AuthModule,
     UserModule,
     AdminModule,
     UploadModule,
+    PaymentModule,
   ],
   providers: [
     // ─── Global Guards ─────────────────────────────────────────────────────────
@@ -55,6 +62,10 @@ import { UploadModule } from './upload/upload.module';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PlanGuard,
     },
 
     // ─── Global Filter ─────────────────────────────────────────────────────────
