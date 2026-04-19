@@ -49,7 +49,7 @@ Each plan needs a **Price ID**. This is what you pass to `POST /api/payment/chec
 5. On the product page, copy the **Price ID** — it starts with `price_...`
 
 ```env
-STRIPE_PRICE_ID_PRO=price_...
+STRIPE_PRICE_PRO_MONTHLY=price_...
 ```
 
 ### Create the LIFETIME plan (one-time)
@@ -61,7 +61,7 @@ STRIPE_PRICE_ID_PRO=price_...
 5. Copy the **Price ID**
 
 ```env
-STRIPE_PRICE_ID_LIFETIME=price_...
+STRIPE_PRICE_LIFETIME=price_...
 ```
 
 ---
@@ -122,8 +122,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 ```env
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID_PRO=price_...
-STRIPE_PRICE_ID_LIFETIME=price_...
+STRIPE_PRICE_PRO_MONTHLY=price_...
+STRIPE_PRICE_LIFETIME=price_...
 ```
 
 ---
@@ -321,10 +321,59 @@ Lifetime users bypass the expiry check entirely.
 - [ ] Switch Stripe to **Live mode** — replace `sk_test_...` with `sk_live_...`
 - [ ] Create a **live webhook endpoint** pointing to your production URL
 - [ ] Copy the **live webhook signing secret** (`whsec_...`) into your production env vars
-- [ ] Create **live price IDs** (separate from test price IDs) and update `STRIPE_PRICE_ID_PRO` / `STRIPE_PRICE_ID_LIFETIME`
+- [ ] Create **live price IDs** (separate from test price IDs) and update `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_LIFETIME`
 - [ ] Set all four Stripe env vars in Vercel → **Settings** → **Environment Variables**
 - [ ] Verify `STRIPE_WEBHOOK_SECRET` in production matches the live endpoint secret (not the CLI secret)
 - [ ] Activate your Stripe account (fill in business details) before going live
+
+---
+
+## Testing on deployed Vercel (no frontend needed)
+
+You can test the full end-to-end payment flow directly from Swagger — same pattern as Google OAuth.
+
+### One-time purchase (LIFETIME)
+
+1. In Swagger, authorize with your JWT
+2. Hit `POST /api/payment/checkout` with:
+   ```json
+   {
+     "priceId": "price_...",
+     "successUrl": "https://your-app.vercel.app/api/docs",
+     "cancelUrl": "https://your-app.vercel.app/api/docs"
+   }
+   ```
+3. Copy the `url` from the response and open it in your browser
+4. Pay with test card `4242 4242 4242 4242`, any future expiry, any CVC
+5. Stripe fires `checkout.session.completed` to your webhook automatically
+6. Come back to Swagger → `GET /api/payment/plan` — you should see `"plan": "lifetime"`
+
+### Subscription (PRO)
+
+Same steps but use your recurring price ID. Stripe fires both `checkout.session.completed` and `invoice.paid`. The plan is set by `invoice.paid`.
+
+### Resending a failed webhook
+
+If the webhook failed (e.g. `STRIPE_WEBHOOK_SECRET` was missing at the time), go to Stripe Dashboard → **Developers** → **Webhooks** → your endpoint → find the event → click **Resend**. Do not use `stripe trigger` — it generates synthetic events with no `metadata.userId` and will not update your user.
+
+---
+
+## Internal testing (local dev only)
+
+The `PaymentInternalTestingModule` (`src/payment-internal-testing/`) lets you simulate payment outcomes locally without going through Stripe at all. Authenticate with your JWT and call these endpoints from Swagger:
+
+| Endpoint | What it simulates |
+|----------|-------------------|
+| `POST /api/payment-internal-testing/mock-one-time-purchase` | `checkout.session.completed` (mode=payment) — upgrades to LIFETIME |
+| `POST /api/payment-internal-testing/mock-subscription-created` | First `invoice.paid` — activates PRO with 30-day expiry |
+| `POST /api/payment-internal-testing/mock-subscription-renewed` | Subsequent `invoice.paid` — extends `planExpiresAt` |
+| `POST /api/payment-internal-testing/mock-subscription-cancelled` | `customer.subscription.deleted` — downgrades to FREE |
+| `POST /api/payment-internal-testing/reset-plan` | Hard-reset to FREE (no transaction created) |
+| `GET /api/payment-internal-testing/my-payment-state` | Full plan state + transaction history |
+
+All mock endpoints write real transaction records and mutate `user.plan` / `user.planExpiresAt` identically to how real webhooks do. Use `reset-plan` between scenarios to restore a clean state.
+
+**On Vercel/production:** use the real Stripe flow — these endpoints exist only to speed up local development.
 
 ---
 
@@ -338,3 +387,4 @@ Lifetime users bypass the expiry check entirely.
 | `503` on checkout | `STRIPE_SECRET_KEY` missing or empty | Check `.env` and restart the server |
 | Duplicate transaction error | Stripe retried an event already processed | Expected behavior — `existsByStripeEventId` returns `true`, event is skipped |
 | User still on `free` after paying | `checkout.session.completed` mode was `subscription` | Correct — plan is set by `invoice.paid`, which fires immediately after. Check both events in CLI output |
+| User still on `free` after webhook 200 OK | `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_LIFETIME` env var names don't match what the code reads | Verify your `.env` and Vercel env vars use exactly `STRIPE_PRICE_PRO_MONTHLY` and `STRIPE_PRICE_LIFETIME` |

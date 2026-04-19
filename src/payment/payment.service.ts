@@ -40,8 +40,8 @@ export class PaymentService implements IPaymentService {
 
 
 
-    const proPriceId = this.config.get<string>('STRIPE_PRICE_ID_PRO')?.trim() ?? '';
-    const lifetimePriceId = this.config.get<string>('STRIPE_PRICE_ID_LIFETIME')?.trim() ?? '';
+    const proPriceId = this.config.get<string>('STRIPE_PRICE_PRO_MONTHLY')?.trim() ?? '';
+    const lifetimePriceId = this.config.get<string>('STRIPE_PRICE_LIFETIME')?.trim() ?? '';
     this.priceIdToPlan = {
       [proPriceId]: PaymentPlanId.PRO,
       [lifetimePriceId]: PaymentPlanId.LIFETIME,

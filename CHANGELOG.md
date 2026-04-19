@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-04-19]
+
+### Added
+
+- **`PaymentInternalTestingModule`** (`src/payment-internal-testing/`): local dev module for simulating payment outcomes without Stripe. All endpoints require a valid JWT and operate on the authenticated user — no `userId` in the request body.
+  - `POST /api/payment-internal-testing/mock-one-time-purchase` — simulates `checkout.session.completed` (mode=payment); upgrades plan to LIFETIME (or any non-FREE plan), writes `one_time_purchase` transaction.
+  - `POST /api/payment-internal-testing/mock-subscription-created` — simulates first `invoice.paid`; user must be on FREE plan, activates given plan with 30-day `planExpiresAt`, writes `subscription_created` transaction.
+  - `POST /api/payment-internal-testing/mock-subscription-renewed` — simulates recurring `invoice.paid`; extends `planExpiresAt`, writes `subscription_renewed` transaction.
+  - `POST /api/payment-internal-testing/mock-subscription-cancelled` — simulates `customer.subscription.deleted`; downgrades to FREE, writes `subscription_cancelled` transaction.
+  - `POST /api/payment-internal-testing/reset-plan` — hard-resets plan to FREE without creating a transaction record; use between test scenarios.
+  - `GET /api/payment-internal-testing/my-payment-state` — returns full plan state + all transactions for the authenticated user.
+- **Response DTOs** for both payment modules with full Swagger schema coverage:
+  - `src/payment/dto/payment-response.dto.ts`: `CheckoutSessionResponseDto`, `BillingPortalSessionResponseDto`, `UserPlanResponseDto`
+  - `src/payment-internal-testing/dto/mock-response.dto.ts`: `MockPurchaseResponseDto`, `MockSubscriptionResponseDto`, `MockResetResponseDto`, `MockPaymentStateResponseDto`, `MockTransactionDto`, `MockUserStateDto`
+- `@ApiResponse(ApiSuccessResponse(...))` and `@ApiResponse(ApiErrorResponse(...))` added to all payment and internal testing controller endpoints.
+
+### Fixed
+
+- **Env var name mismatch** in `PaymentService`: code was reading `STRIPE_PRICE_ID_PRO` and `STRIPE_PRICE_ID_LIFETIME` but `.env` defines `STRIPE_PRICE_PRO_MONTHLY` and `STRIPE_PRICE_LIFETIME`. This caused `priceIdToPlan` to build a map with empty-string keys, so webhook handlers always fell back to `PaymentPlanId.FREE` — plans never updated after payment. Fixed to read the correct names.
+- **`@ApiBearerAuth()` missing scheme name** on `PaymentController` and `PaymentInternalTestingController`: using `@ApiBearerAuth()` with no argument registers against the default `bearer` scheme which does not exist in this project's Swagger config (registered as `JWT-auth`). Changed to `@ApiBearerAuth('JWT-auth')` so the lock icon in Swagger shows the correct authorization field.
+
+### Changed
+
+- `documentation/STRIPE.md`: corrected all env var references from `STRIPE_PRICE_ID_PRO` / `STRIPE_PRICE_ID_LIFETIME` to `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_LIFETIME`. Added "Testing on deployed Vercel" section documenting the browser-based E2E flow (same pattern as OAuth). Added "Internal testing" section documenting all mock endpoints. Added troubleshooting entry for plan-not-updating after webhook succeeds.
+
+---
+
 ## [2026-04-18]
 
 ### Added

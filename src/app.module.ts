@@ -18,6 +18,7 @@ import { loadEnvConfigs } from './common/config/env.config';
 import { buildMongoUri } from './common/config/mongo-uri-builder';
 import { UploadModule } from './upload/upload.module';
 import { PaymentModule } from './payment/payment.module';
+import { PaymentInternalTestingModule } from './payment-internal-testing/payment-internal-testing.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { PaymentModule } from './payment/payment.module';
     AdminModule,
     UploadModule,
     PaymentModule,
+    PaymentInternalTestingModule,
   ],
   providers: [
     // ─── Global Guards ─────────────────────────────────────────────────────────
