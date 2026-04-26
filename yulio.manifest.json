@@ -1,0 +1,72 @@
+{
+  "version": "1",
+  "modules": {
+    "mail": {
+      "description": "Nodemailer SMTP email service with verification + welcome templates",
+      "files": "src/mail",
+      "appModuleImport": "MailModule",
+      "appModuleImportPath": "./mail/mail.module",
+      "wireTarget": "imports",
+      "wireMode": "simple",
+      "envVars": [
+        "MAIL_HOST=",
+        "MAIL_PORT=587",
+        "MAIL_USER=",
+        "MAIL_PASSWORD=",
+        "MAIL_FROM=",
+        "COMPANY_NAME=",
+        "COMPANY_LOGO_URL="
+      ],
+      "packages": ["nodemailer", "@types/nodemailer"],
+      "devPackages": ["@types/nodemailer"],
+      "dependsOn": ["config"]
+    },
+    "payment": {
+      "description": "Stripe payments — checkout sessions, billing portal, webhooks, plan enforcement",
+      "files": "src/payment",
+      "appModuleImport": "PaymentModule",
+      "appModuleImportPath": "./payment/payment.module",
+      "wireTarget": "imports",
+      "wireMode": "simple",
+      "additionalFiles": [
+        "src/common/enums/payment-plan.enum.ts",
+        "src/common/interfaces/payment.interface.ts",
+        "src/common/interfaces/transaction.interface.ts",
+        "src/common/decorators/plan.decorator.ts",
+        "src/common/guards/plan.guard.ts"
+      ],
+      "userEntityFields": [
+        "stripeCustomerId?: string;",
+        "plan: PaymentPlanId;",
+        "planExpiresAt?: Date;"
+      ],
+      "envVars": [
+        "STRIPE_SECRET_KEY=",
+        "STRIPE_WEBHOOK_SECRET=",
+        "STRIPE_PRICE_PRO_MONTHLY=",
+        "STRIPE_PRICE_LIFETIME="
+      ],
+      "packages": ["stripe"],
+      "devPackages": [],
+      "dependsOn": ["config", "user"]
+    },
+    "upload": {
+      "description": "Cloudflare R2 / AWS S3 file upload with multipart support",
+      "files": "src/upload",
+      "appModuleImport": "UploadModule",
+      "appModuleImportPath": "./upload/upload.module",
+      "wireTarget": "imports",
+      "wireMode": "simple",
+      "envVars": [
+        "R2_ACCOUNT_ID=",
+        "R2_ACCESS_KEY_ID=",
+        "R2_SECRET_ACCESS_KEY=",
+        "R2_BUCKET_NAME=",
+        "R2_PUBLIC_URL="
+      ],
+      "packages": ["@aws-sdk/client-s3", "multer", "@types/multer"],
+      "devPackages": ["@types/multer"],
+      "dependsOn": ["config"]
+    }
+  }
+}
