@@ -37,6 +37,7 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
         ?? profile._json?.mail
         ?? profile._json?.userPrincipalName
         ?? null,
+      emailVerified: true, // AAD/Entra accounts are org-managed; no unverified email risk
       displayName: profile.displayName ?? profile._json?.displayName ?? 'Microsoft User',
       avatar: null,
       accessToken,

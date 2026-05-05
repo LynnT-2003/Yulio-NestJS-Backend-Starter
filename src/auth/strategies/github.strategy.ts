@@ -30,14 +30,14 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     profile: Profile,
   ): Promise<IAuthResponse> {
     // GitHub returns emails as an array — pick the primary verified one
-    const primaryEmail = profile.emails?.find((e: any) => e.primary && e.verified)?.value
-      ?? profile.emails?.[0]?.value
-      ?? null;
+    const primaryEmailObj = profile.emails?.find((e: any) => e.primary && e.verified);
+    const primaryEmail = primaryEmailObj?.value ?? profile.emails?.[0]?.value ?? null;
 
     const dto: OAuthUserDto = {
       provider: OAuthProviderType.GITHUB,
       providerId: profile.id,
       email: primaryEmail,
+      emailVerified: !!primaryEmailObj,
       displayName: profile.displayName ?? profile.username ?? 'GitHub User',
       avatar: profile.photos?.[0]?.value ?? null,
       accessToken,

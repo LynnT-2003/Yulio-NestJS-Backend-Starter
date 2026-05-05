@@ -1,10 +1,10 @@
 {
-  "name": "easydeal-backend",
+  "name": "nestjs-swagger-vercel-template",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
-  "private": true,
-  "license": "UNLICENSED",
+  "description": "Opinionated NestJS starter with multi-provider OAuth, Swagger, and Vercel deployment",
+  "author": "Yulio Labs",
+  "private": false,
+  "license": "MIT",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

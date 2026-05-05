@@ -33,6 +33,7 @@ export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
       provider: OAuthProviderType.DISCORD,
       providerId: profile.id,
       email: profile.email ?? null,
+      emailVerified: profile.verified === true,
       displayName: profile.global_name ?? profile.username ?? 'Discord User',
       avatar: profile.avatar
         ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`

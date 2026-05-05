@@ -85,6 +85,7 @@ export class LineStrategy extends PassportStrategy(Strategy, 'line') {
       provider: OAuthProviderType.LINE,
       providerId: data.userId,
       email: data.email ?? null,
+      emailVerified: false, // LINE profile API does not return email_verified
       displayName: data.displayName ?? 'LINE User',
       avatar: data.pictureUrl ?? null,
       accessToken,

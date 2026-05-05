@@ -8,6 +8,7 @@ export class OAuthUserDto {
     provider: OAuthProviderType;
     providerId: string;
     email: string | null;
+    emailVerified: boolean;
     displayName: string;
     avatar: string | null;
     accessToken: string | null;

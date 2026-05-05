@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { isValidObjectId, QueryFilter, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
@@ -96,6 +97,12 @@ export class UserService implements IUserService {
       const byEmail = await this.userRepo.findByEmail(dto.email);
 
       if (byEmail) {
+        if (!dto.emailVerified) {
+          throw new UnauthorizedException(
+            'Cannot link account: the email address has not been verified by the provider',
+          );
+        }
+
         byEmail.providers.push({
           provider: dto.provider,
           providerId: dto.providerId,
